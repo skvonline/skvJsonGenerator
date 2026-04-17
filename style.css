@@ -1,7 +1,7 @@
 :root {
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  color: #1f2937;
-  background: #f3f4f6;
+  color: #0f2f5f;
+  background: #e9f2ff;
 }
 
 * { box-sizing: border-box; }
@@ -16,14 +16,15 @@ body { margin: 0; }
 
 h1, h2 { margin-top: 0; }
 
-.lead { margin-top: 0; color: #374151; }
+.lead { margin-top: 0; color: #154b95; }
 
 .panel {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border: 1px solid #a8c7f5;
   border-radius: 12px;
   padding: 1rem;
   margin-bottom: 1rem;
+  box-shadow: 0 4px 12px rgba(13, 71, 161, 0.08);
 }
 
 .controls { display: grid; gap: 0.75rem; }
@@ -50,14 +51,19 @@ h1, h2 { margin-top: 0; }
 }
 
 button {
-  border: 1px solid #d1d5db;
-  background: #f9fafb;
+  border: 1px solid #1d4ed8;
+  background: #1d4ed8;
+  color: #ffffff;
   border-radius: 8px;
   padding: 0.5rem 0.75rem;
   cursor: pointer;
 }
 
-button:hover { background: #eef2ff; }
+button:hover { background: #1e40af; }
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 label { font-weight: 600; }
 
@@ -65,13 +71,26 @@ input,
 textarea,
 select {
   width: 100%;
-  border: 1px solid #d1d5db;
+  border: 1px solid #8cb3ea;
   border-radius: 8px;
   padding: 0.45rem;
+  background: #ffffff;
+}
+
+.form-field.has-error label,
+.list-block.has-error .list-block-title {
+  color: #b91c1c;
+}
+
+.form-field.has-error input,
+.form-field.has-error textarea,
+.list-block.has-error {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
 }
 
 .entry {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #bfd5f6;
   border-radius: 8px;
   margin-bottom: 0.75rem;
 }
@@ -82,8 +101,8 @@ select {
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  background: #eff6ff;
+  border-bottom: 1px solid #bfd5f6;
 }
 
 .entry-summary {
@@ -111,7 +130,7 @@ select {
 }
 
 .list-block {
-  border: 1px dashed #d1d5db;
+  border: 1px dashed #8cb3ea;
   border-radius: 8px;
   padding: 0.5rem;
 }
@@ -136,7 +155,7 @@ select {
 }
 
 .list-item {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #bfd5f6;
   border-radius: 8px;
   padding: 0.5rem;
   margin-bottom: 0.5rem;
@@ -146,8 +165,8 @@ pre {
   min-height: 180px;
   white-space: pre-wrap;
   word-break: break-word;
-  background: #111827;
-  color: #f9fafb;
+  background: #0f2f5f;
+  color: #f8fbff;
   border-radius: 8px;
   padding: 0.75rem;
 }

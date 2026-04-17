@@ -31,9 +31,7 @@
 
         <div class="actions">
           <button id="addEntryBtn" type="button">Eintrag hinzufügen</button>
-          <button id="generateBtn" type="button">JSON generieren</button>
-          <button id="copyBtn" type="button">JSON kopieren</button>
-          <button id="downloadBtn" type="button">Als Datei herunterladen</button>
+          <button id="generateBtn" type="button">Validieren</button>
         </div>
       </section>
 
@@ -50,6 +48,10 @@
       <section class="panel">
         <h2>Ergebnis JSON</h2>
         <pre id="output" aria-live="polite"></pre>
+        <div id="resultActions" class="actions hidden">
+          <button id="copyBtn" type="button">JSON kopieren</button>
+          <button id="downloadBtn" type="button">Als Datei herunterladen</button>
+        </div>
       </section>
     </main>
 
