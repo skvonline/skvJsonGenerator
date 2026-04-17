@@ -169,11 +169,13 @@ const loadOnlineBtn = document.querySelector("#loadOnlineBtn");
 const entriesEl = document.querySelector("#entries");
 const outputEl = document.querySelector("#output");
 const validationList = document.querySelector("#validationList");
+const validationPanel = document.querySelector("#validationPanel");
 const addEntryBtn = document.querySelector("#addEntryBtn");
 const generateBtn = document.querySelector("#generateBtn");
 const copyBtn = document.querySelector("#copyBtn");
 const downloadBtn = document.querySelector("#downloadBtn");
 const resultActions = document.querySelector("#resultActions");
+const scrollTopBtn = document.querySelector("#scrollTopBtn");
 
 function appendOption(key) {
   const opt = document.createElement("option");
@@ -818,6 +820,8 @@ function validateAndGenerate() {
     outputEl.textContent = JSON.stringify(entries, null, 2);
     resultActions.classList.remove("hidden");
   }
+
+  validationPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderEntries(typeKey, dataList = null, { useTemplate = false } = {}) {
@@ -935,6 +939,15 @@ downloadBtn.addEventListener("click", () => {
 
   a.click();
   URL.revokeObjectURL(a.href);
+});
+
+scrollTopBtn?.addEventListener("click", () => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+window.addEventListener("scroll", () => {
+  const shouldShow = window.scrollY > 320;
+  scrollTopBtn?.classList.toggle("hidden", !shouldShow);
 });
 
 entriesEl.addEventListener("input", (event) => {
