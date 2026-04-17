@@ -196,6 +196,10 @@ function resetValidationUi() {
 function toInputValue(value, fieldType) {
   if (fieldType === "csv") return Array.isArray(value) ? value.join(", ") : "";
   if (fieldType === "checkbox") return !!value;
+  if (fieldType === "textarea") {
+    if (Array.isArray(value)) return value.join("\n\n");
+    if (value && typeof value === "object") return JSON.stringify(value, null, 2);
+  }
   return value ?? "";
 }
 
@@ -210,6 +214,7 @@ function createInput(field, value) {
   let input;
   if (field.type === "textarea") {
     input = document.createElement("textarea");
+    input.value = toInputValue(value, field.type);
   } else if (field.type === "checkbox") {
     input = document.createElement("input");
     input.type = "checkbox";
@@ -328,6 +333,13 @@ function readEntry(entryEl) {
 
     if (type === "checkbox") {
       if (input.checked) data[name] = true;
+      return;
+    }
+
+    if (type === "textarea") {
+      const rawValue = input.value;
+      if (!rawValue.trim()) return;
+      data[name] = rawValue;
       return;
     }
 
@@ -624,7 +636,17 @@ async function loadOnlineJson() {
     const json = await response.json();
     if (!Array.isArray(json)) throw new Error("Top-Level ist kein Array");
 
-    renderEntries(typeSelect.value, json);
+    const normalizedJson = json.map((entry) => {
+      if (typeSelect.value !== "news") return entry;
+
+      if (entry && !entry.text && typeof entry.description === "string") {
+        return { ...entry, text: entry.description };
+      }
+
+      return entry;
+    });
+
+    renderEntries(typeSelect.value, normalizedJson);
     loadOnlineBtn.textContent = "Online JSON geladen";
   } catch (error) {
     loadOnlineBtn.textContent = `Fehler beim Laden (${error.message})`;
