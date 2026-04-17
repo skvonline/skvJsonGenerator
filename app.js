@@ -158,7 +158,6 @@ const specs = {
 const typeSelect = document.querySelector("#typeSelect");
 const galleryNameWrap = document.querySelector("#galleryNameWrap");
 const galleryNameInput = document.querySelector("#galleryNameInput");
-const baseUrlInput = document.querySelector("#baseUrlInput");
 const loadOnlineBtn = document.querySelector("#loadOnlineBtn");
 const entriesEl = document.querySelector("#entries");
 const outputEl = document.querySelector("#output");
@@ -174,8 +173,6 @@ Object.keys(specs).forEach((key) => {
   opt.textContent = `${key} (${specs[key].filename})`;
   typeSelect.append(opt);
 });
-
-baseUrlInput.value = CONFIG.DEFAULT_BASE_URL;
 
 const dateRegex = /^\d{2}\.\d{2}\.\d{4}$/;
 const windowRegex = /^\d{4}-\d{2}-\d{2}-\d{2}:\d{2}$/;
@@ -251,7 +248,7 @@ function addListItem(field, container, value = {}) {
 
 function createListBlock(field, value = []) {
   const block = document.createElement("div");
-  block.className = "list-block is-collapsed";
+  block.className = "list-block";
 
   const header = document.createElement("div");
   header.className = "list-block-header";
@@ -264,16 +261,24 @@ function createListBlock(field, value = []) {
   toggleBtn.type = "button";
   toggleBtn.className = "list-toggle-btn";
   toggleBtn.textContent = "Aufklappen";
-  toggleBtn.addEventListener("click", () => {
-    const isCollapsed = block.classList.toggle("is-collapsed");
-    toggleBtn.textContent = isCollapsed ? "Aufklappen" : "Zuklappen";
-  });
   header.append(toggleBtn);
   block.append(header);
 
   const content = document.createElement("div");
   content.className = "list-block-content";
   block.append(content);
+
+  function setCollapsed(collapsed) {
+    block.classList.toggle("is-collapsed", collapsed);
+    content.hidden = collapsed;
+    toggleBtn.textContent = collapsed ? "Aufklappen" : "Zuklappen";
+    toggleBtn.setAttribute("aria-expanded", String(!collapsed));
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    const willCollapse = !block.classList.contains("is-collapsed");
+    setCollapsed(willCollapse);
+  });
 
   const listContainer = document.createElement("div");
   content.append(listContainer);
@@ -282,8 +287,7 @@ function createListBlock(field, value = []) {
   addBtn.type = "button";
   addBtn.textContent = `${field.name}-Eintrag hinzufügen`;
   addBtn.addEventListener("click", () => {
-    block.classList.remove("is-collapsed");
-    toggleBtn.textContent = "Zuklappen";
+    setCollapsed(false);
     addListItem(field, listContainer);
     generateJson();
   });
@@ -296,6 +300,7 @@ function createListBlock(field, value = []) {
   block.dataset.field = field.name;
   block.dataset.fieldType = field.type;
   block.dataset.required = String(!!field.required);
+  setCollapsed(true);
   return block;
 }
 
@@ -524,8 +529,7 @@ function renderEntries(typeKey, dataList = null) {
 }
 
 function getFetchUrl() {
-  const base = baseUrlInput.value.trim().replace(/\/$/, "");
-  if (!base) return null;
+  const base = CONFIG.DEFAULT_BASE_URL.replace(/\/$/, "");
 
   if (typeSelect.value === "gallery") {
     const galleryName = galleryNameInput.value.trim() || "home-gallery";
