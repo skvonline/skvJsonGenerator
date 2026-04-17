@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SKV JSON Generator</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>SKV JSON Generator</h1>
+      <p class="lead">
+        Erstelle valide JSON-Arrays für <code>src/data</code> gemäß der Spezifikation.
+      </p>
+
+      <section class="panel controls">
+        <label for="typeSelect">Dateityp</label>
+        <select id="typeSelect"></select>
+
+        <div class="actions">
+          <button id="addEntryBtn" type="button">Eintrag hinzufügen</button>
+          <button id="generateBtn" type="button">JSON generieren</button>
+          <button id="copyBtn" type="button">JSON kopieren</button>
+          <button id="downloadBtn" type="button">Als Datei herunterladen</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Einträge</h2>
+        <div id="entries"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Validierung</h2>
+        <ul id="validationList"></ul>
+      </section>
+
+      <section class="panel">
+        <h2>Ergebnis JSON</h2>
+        <pre id="output" aria-live="polite"></pre>
+      </section>
+    </main>
+
+    <template id="entryTemplate">
+      <article class="entry"></article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
