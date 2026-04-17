@@ -158,7 +158,6 @@ const specs = {
 const typeSelect = document.querySelector("#typeSelect");
 const galleryNameWrap = document.querySelector("#galleryNameWrap");
 const galleryNameInput = document.querySelector("#galleryNameInput");
-const baseUrlInput = document.querySelector("#baseUrlInput");
 const loadOnlineBtn = document.querySelector("#loadOnlineBtn");
 const entriesEl = document.querySelector("#entries");
 const outputEl = document.querySelector("#output");
@@ -174,8 +173,6 @@ Object.keys(specs).forEach((key) => {
   opt.textContent = `${key} (${specs[key].filename})`;
   typeSelect.append(opt);
 });
-
-baseUrlInput.value = CONFIG.DEFAULT_BASE_URL;
 
 const dateRegex = /^\d{2}\.\d{2}\.\d{4}$/;
 const windowRegex = /^\d{4}-\d{2}-\d{2}-\d{2}:\d{2}$/;
@@ -252,21 +249,49 @@ function addListItem(field, container, value = {}) {
 function createListBlock(field, value = []) {
   const block = document.createElement("div");
   block.className = "list-block";
+
+  const header = document.createElement("div");
+  header.className = "list-block-header";
+
   const title = document.createElement("p");
   title.innerHTML = `<strong>${field.name}${field.required ? " *" : ""}</strong>`;
-  block.append(title);
+  header.append(title);
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "list-toggle-btn";
+  toggleBtn.textContent = "Aufklappen";
+  header.append(toggleBtn);
+  block.append(header);
+
+  const content = document.createElement("div");
+  content.className = "list-block-content";
+  block.append(content);
+
+  function setCollapsed(collapsed) {
+    block.classList.toggle("is-collapsed", collapsed);
+    content.hidden = collapsed;
+    toggleBtn.textContent = collapsed ? "Aufklappen" : "Zuklappen";
+    toggleBtn.setAttribute("aria-expanded", String(!collapsed));
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    const willCollapse = !block.classList.contains("is-collapsed");
+    setCollapsed(willCollapse);
+  });
 
   const listContainer = document.createElement("div");
-  block.append(listContainer);
+  content.append(listContainer);
 
   const addBtn = document.createElement("button");
   addBtn.type = "button";
   addBtn.textContent = `${field.name}-Eintrag hinzufügen`;
   addBtn.addEventListener("click", () => {
+    setCollapsed(false);
     addListItem(field, listContainer);
     generateJson();
   });
-  block.append(addBtn);
+  content.append(addBtn);
 
   const listValues = Array.isArray(value) ? value : [];
   listValues.forEach((item) => addListItem(field, listContainer, item));
@@ -275,6 +300,7 @@ function createListBlock(field, value = []) {
   block.dataset.field = field.name;
   block.dataset.fieldType = field.type;
   block.dataset.required = String(!!field.required);
+  setCollapsed(true);
   return block;
 }
 
@@ -503,8 +529,7 @@ function renderEntries(typeKey, dataList = null) {
 }
 
 function getFetchUrl() {
-  const base = baseUrlInput.value.trim().replace(/\/$/, "");
-  if (!base) return null;
+  const base = CONFIG.DEFAULT_BASE_URL.replace(/\/$/, "");
 
   if (typeSelect.value === "gallery") {
     const galleryName = galleryNameInput.value.trim() || "home-gallery";
