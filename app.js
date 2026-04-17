@@ -572,7 +572,7 @@ function moveEntry(entryEl, direction) {
   resetValidationUi();
 }
 
-function addEntry(defaults = {}, { expand = true, insert = "auto" } = {}) {
+function addEntry(defaults = {}, { expand = true, insert = "auto", scrollToEntry = true } = {}) {
   const typeKey = typeSelect.value;
   const spec = specs[typeKey];
   const shouldPrepend = insert === "start" || (insert === "auto" && (typeKey === "news" || typeKey === "royals"));
@@ -659,6 +659,10 @@ function addEntry(defaults = {}, { expand = true, insert = "auto" } = {}) {
   else collapseAllEntries();
 
   renumberAndRefreshSummaries();
+
+  if (scrollToEntry) {
+    entry.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 function validateAndGenerate() {
@@ -681,7 +685,11 @@ function renderEntries(typeKey, dataList = null) {
   const spec = specs[typeKey];
   const defaults = Array.isArray(dataList) && dataList.length > 0 ? dataList : [spec.template];
 
-  defaults.forEach((item, index) => addEntry(item, { expand: index === 0, insert: "end" }));
+  defaults.forEach((item, index) => addEntry(item, {
+    expand: index === 0,
+    insert: "end",
+    scrollToEntry: false
+  }));
   if (defaults.length > 1) collapseAllEntries();
   renumberAndRefreshSummaries();
 }
