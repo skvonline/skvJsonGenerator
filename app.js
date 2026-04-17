@@ -12,6 +12,30 @@ const linkLabelOptions = [
   { value: "Maps", label: "Maps", type: "maps" }
 ];
 
+const vorstandSocialLabelOptions = [
+  { value: "", label: "Bitte wählen" },
+  { value: "E-Mail", label: "E-Mail" },
+  { value: "Instagram", label: "Instagram" },
+  { value: "Facebook", label: "Facebook" },
+  { value: "TikTok", label: "TikTok" }
+];
+
+const vorstandSocialClassOptions = [
+  { value: "", label: "Bitte wählen" },
+  { value: "liEmail", label: "liEmail" },
+  { value: "liInsta", label: "liInsta" },
+  { value: "liFacebook", label: "liFacebook" },
+  { value: "liTiktok", label: "liTiktok" }
+];
+
+const vorstandSocialIconOptions = [
+  { value: "", label: "Bitte wählen" },
+  { value: "@", label: "@" },
+  { value: "Instagram", label: "Instagram" },
+  { value: "f", label: "f" },
+  { value: "♪", label: "♪" }
+];
+
 const specs = {
   news: {
     filename: "news.json",
@@ -87,10 +111,10 @@ const specs = {
         type: "list",
         required: true,
         itemFields: [
-          { name: "label", type: "text", required: true },
+          { name: "label", type: "select", required: true, options: vorstandSocialLabelOptions },
           { name: "href", type: "text", required: true },
-          { name: "className", type: "text", required: true },
-          { name: "icon", type: "text", required: true }
+          { name: "className", type: "select", required: true, options: vorstandSocialClassOptions },
+          { name: "icon", type: "select", required: true, options: vorstandSocialIconOptions }
         ]
       }
     ],
