@@ -148,8 +148,8 @@ const specs = {
       { name: "session", type: "text", required: true },
       { name: "year", type: "text", required: true },
       { name: "image", type: "text", required: true, filenameOnly: true, pathPrefix: "./src/img/verein/prinzenpaare/" },
-      { name: "adultPair", type: "pairList", required: true },
-      { name: "childPair", type: "pairList" }
+      { name: "adultPair", type: "pairList", required: true, maxItems: 1 },
+      { name: "childPair", type: "pairList", maxItems: 1 }
     ],
     template: {
       session: "48. Session",
@@ -384,7 +384,7 @@ function createInput(field, value) {
   return { wrapper, input };
 }
 
-function addListItem(field, container, value = {}) {
+function addListItem(field, container, value = {}, onChange = () => {}) {
   const item = document.createElement("div");
   item.className = "list-item";
 
@@ -393,6 +393,7 @@ function addListItem(field, container, value = {}) {
   removeBtn.textContent = "Entfernen";
   removeBtn.addEventListener("click", () => {
     item.remove();
+    onChange();
     resetValidationUi();
   });
   item.append(removeBtn);
@@ -419,6 +420,7 @@ function addListItem(field, container, value = {}) {
   });
 
   container.append(item);
+  onChange();
 }
 
 function createListBlock(field, value = []) {
@@ -462,16 +464,26 @@ function createListBlock(field, value = []) {
   const addBtn = document.createElement("button");
   addBtn.type = "button";
   addBtn.textContent = `${field.name}-Eintrag hinzufügen`;
+  const maxItems = Number.isFinite(field.maxItems) ? Math.max(0, Number(field.maxItems)) : Infinity;
+
+  const updateAddButtonState = () => {
+    const currentCount = listContainer.querySelectorAll(".list-item").length;
+    addBtn.hidden = currentCount >= maxItems;
+  };
+
   addBtn.addEventListener("click", () => {
+    const currentCount = listContainer.querySelectorAll(".list-item").length;
+    if (currentCount >= maxItems) return;
     setCollapsed(false);
-    addListItem(field, listContainer);
+    addListItem(field, listContainer, {}, updateAddButtonState);
     resetValidationUi();
   });
   content.append(addBtn);
 
   const listValues = Array.isArray(value) ? value : [];
-  listValues.forEach((item) => addListItem(field, listContainer, item));
-  if (listValues.length === 0 && field.required) addListItem(field, listContainer);
+  listValues.forEach((item) => addListItem(field, listContainer, item, updateAddButtonState));
+  if (listValues.length === 0 && field.required) addListItem(field, listContainer, {}, updateAddButtonState);
+  updateAddButtonState();
 
   block.dataset.field = field.name;
   block.dataset.fieldType = field.type;
