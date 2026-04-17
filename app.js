@@ -251,22 +251,43 @@ function addListItem(field, container, value = {}) {
 
 function createListBlock(field, value = []) {
   const block = document.createElement("div");
-  block.className = "list-block";
+  block.className = "list-block is-collapsed";
+
+  const header = document.createElement("div");
+  header.className = "list-block-header";
+
   const title = document.createElement("p");
   title.innerHTML = `<strong>${field.name}${field.required ? " *" : ""}</strong>`;
-  block.append(title);
+  header.append(title);
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "list-toggle-btn";
+  toggleBtn.textContent = "Aufklappen";
+  toggleBtn.addEventListener("click", () => {
+    const isCollapsed = block.classList.toggle("is-collapsed");
+    toggleBtn.textContent = isCollapsed ? "Aufklappen" : "Zuklappen";
+  });
+  header.append(toggleBtn);
+  block.append(header);
+
+  const content = document.createElement("div");
+  content.className = "list-block-content";
+  block.append(content);
 
   const listContainer = document.createElement("div");
-  block.append(listContainer);
+  content.append(listContainer);
 
   const addBtn = document.createElement("button");
   addBtn.type = "button";
   addBtn.textContent = `${field.name}-Eintrag hinzufügen`;
   addBtn.addEventListener("click", () => {
+    block.classList.remove("is-collapsed");
+    toggleBtn.textContent = "Zuklappen";
     addListItem(field, listContainer);
     generateJson();
   });
-  block.append(addBtn);
+  content.append(addBtn);
 
   const listValues = Array.isArray(value) ? value : [];
   listValues.forEach((item) => addListItem(field, listContainer, item));
