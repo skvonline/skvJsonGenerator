@@ -168,11 +168,33 @@ const copyBtn = document.querySelector("#copyBtn");
 const downloadBtn = document.querySelector("#downloadBtn");
 const resultActions = document.querySelector("#resultActions");
 
-Object.keys(specs).forEach((key) => {
+const typeOrder = {
+  oben: ["news", "royals"],
+  unten: ["events", "vorstand", "elferrat", "linktree"]
+};
+
+function appendOption(key, parent = typeSelect) {
+  if (!specs[key]) return;
   const opt = document.createElement("option");
   opt.value = key;
   opt.textContent = `${key} (${specs[key].filename})`;
-  typeSelect.append(opt);
+  parent.append(opt);
+}
+
+const obenGroup = document.createElement("optgroup");
+obenGroup.label = "Oben";
+typeOrder.oben.forEach((key) => appendOption(key, obenGroup));
+
+const untenGroup = document.createElement("optgroup");
+untenGroup.label = "Unten";
+typeOrder.unten.forEach((key) => appendOption(key, untenGroup));
+
+typeSelect.append(obenGroup, untenGroup);
+
+Object.keys(specs).forEach((key) => {
+  const alreadyRendered =
+    typeOrder.oben.includes(key) || typeOrder.unten.includes(key);
+  if (!alreadyRendered) appendOption(key);
 });
 
 const dateRegex = /^\d{2}\.\d{2}\.\d{4}$/;
