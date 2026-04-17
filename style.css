@@ -120,6 +120,17 @@ select {
   border-radius: 0;
 }
 
+.image-preview {
+  display: block;
+  margin-top: 0.5rem;
+  width: min(220px, 100%);
+  max-height: 140px;
+  object-fit: cover;
+  border: 1px solid #8cb3ea;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
 .form-field.has-error label,
 .list-block.has-error .list-block-title {
   color: #b91c1c;

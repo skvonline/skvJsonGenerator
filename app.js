@@ -386,6 +386,24 @@ function getFilenameOnly(value) {
   return trimmed.split(/[\\/]/).pop() || "";
 }
 
+function updateImagePreviewForInput(input) {
+  if (!input || input.dataset.filenameOnly !== "true") return;
+  const previewEl = input.closest(".form-field")?.querySelector(".image-preview");
+  if (!previewEl) return;
+
+  const filename = getFilenameOnly(input.value);
+  const pathPrefix = input.dataset.pathPrefix || "";
+  if (!filename || !pathPrefix) {
+    previewEl.classList.add("hidden");
+    previewEl.removeAttribute("src");
+    return;
+  }
+
+  previewEl.src = `${pathPrefix}${filename}`;
+  previewEl.alt = `Vorschau ${filename}`;
+  previewEl.classList.remove("hidden");
+}
+
 function createInput(field, value) {
   const wrapper = document.createElement("div");
   wrapper.className = "form-field";
@@ -462,6 +480,20 @@ function createInput(field, value) {
   if (field.filenameOnly) input.dataset.filenameOnly = "true";
   if (field.pathPrefix) input.dataset.pathPrefix = field.pathPrefix;
   if (field.allowAuto) input.dataset.allowAuto = "true";
+
+  if (field.filenameOnly) {
+    const preview = document.createElement("img");
+    preview.className = "image-preview hidden";
+    preview.loading = "lazy";
+    preview.decoding = "async";
+    preview.alt = "Bildvorschau";
+    preview.addEventListener("error", () => {
+      preview.classList.add("hidden");
+      preview.removeAttribute("src");
+    });
+    wrapper.append(preview);
+    updateImagePreviewForInput(input);
+  }
 
   return { wrapper, input };
 }
@@ -1148,6 +1180,7 @@ window.addEventListener("scroll", () => {
 entriesEl.addEventListener("input", (event) => {
   const entryEl = event.target.closest(".entry");
   if (entryEl) {
+    updateImagePreviewForInput(event.target);
     if (event.target.dataset.field === "deleteAt") {
       event.target.dataset.autoManaged = "false";
     }
