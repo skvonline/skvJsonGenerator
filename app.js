@@ -197,6 +197,8 @@ const specs = {
 const typeSelect = document.querySelector("#typeSelect");
 const galleryNameWrap = document.querySelector("#galleryNameWrap");
 const galleryNameInput = document.querySelector("#galleryNameInput");
+const confirmGalleryBtn = document.querySelector("#confirmGalleryBtn");
+const galleryConfirmHint = document.querySelector("#galleryConfirmHint");
 const loadOnlineBtn = document.querySelector("#loadOnlineBtn");
 const entriesEl = document.querySelector("#entries");
 const outputEl = document.querySelector("#output");
@@ -208,6 +210,9 @@ const copyBtn = document.querySelector("#copyBtn");
 const downloadBtn = document.querySelector("#downloadBtn");
 const resultActions = document.querySelector("#resultActions");
 const scrollTopBtn = document.querySelector("#scrollTopBtn");
+const DEFAULT_GALLERY_NAME = "home-gallery";
+let confirmedGalleryName = "";
+let galleryNameConfirmed = false;
 
 function appendOption(key) {
   const opt = document.createElement("option");
@@ -278,6 +283,67 @@ function toCurrencyInputValue(value) {
 
 function updateTypeDependentUi() {
   galleryNameWrap.classList.toggle("hidden", typeSelect.value !== "gallery");
+  updateGalleryConfirmationState();
+}
+
+function normalizeGalleryName(value) {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return "";
+  return trimmed.replace(/\.json$/i, "");
+}
+
+function hasEntries() {
+  return entriesEl.querySelectorAll(".entry").length > 0;
+}
+
+function setGalleryHint(text, { warning = false } = {}) {
+  if (!galleryConfirmHint) return;
+  galleryConfirmHint.textContent = text;
+  galleryConfirmHint.classList.toggle("is-warning", warning);
+}
+
+function updateGalleryConfirmationState() {
+  const isGalleryType = typeSelect.value === "gallery";
+  const currentName = normalizeGalleryName(galleryNameInput?.value);
+  const needsConfirmation = isGalleryType && (!galleryNameConfirmed || currentName !== confirmedGalleryName);
+
+  loadOnlineBtn.disabled = needsConfirmation;
+  addEntryBtn.disabled = needsConfirmation;
+
+  if (!isGalleryType) {
+    setGalleryHint("Bitte Ordnernamen bestätigen, bevor Einträge geladen oder erstellt werden.");
+    return;
+  }
+
+  if (needsConfirmation) {
+    setGalleryHint("Bitte den Ordnernamen bestätigen. Danach kannst du Online-JSON laden oder Einträge hinzufügen.", { warning: true });
+    return;
+  }
+
+  setGalleryHint(`Ordner bestätigt: ${confirmedGalleryName}. Du kannst jetzt laden oder Einträge hinzufügen.`);
+}
+
+function confirmGalleryName() {
+  if (typeSelect.value !== "gallery") return;
+  const normalizedName = normalizeGalleryName(galleryNameInput.value) || DEFAULT_GALLERY_NAME;
+  const isNameChange = galleryNameConfirmed && normalizedName !== confirmedGalleryName;
+
+  if (isNameChange && hasEntries()) {
+    const shouldClearEntries = window.confirm(
+      `Der Ordner wurde geändert von "${confirmedGalleryName}" auf "${normalizedName}". Alle aktuellen Einträge werden gelöscht. Fortfahren?`
+    );
+    if (!shouldClearEntries) {
+      galleryNameInput.value = confirmedGalleryName;
+      updateGalleryConfirmationState();
+      return;
+    }
+    renderEntries("gallery");
+  }
+
+  confirmedGalleryName = normalizedName;
+  galleryNameConfirmed = true;
+  galleryNameInput.value = normalizedName;
+  updateGalleryConfirmationState();
 }
 
 function clearResult() {
@@ -960,7 +1026,7 @@ function getFetchUrl() {
   const base = CONFIG.DEFAULT_BASE_URL.replace(/\/$/, "");
 
   if (typeSelect.value === "gallery") {
-    const galleryName = galleryNameInput.value.trim() || "home-gallery";
+    const galleryName = confirmedGalleryName || normalizeGalleryName(galleryNameInput.value) || DEFAULT_GALLERY_NAME;
     return `${base}/src/data/gallerys/${galleryName}.json`;
   }
 
@@ -1004,6 +1070,9 @@ async function loadOnlineJson() {
 }
 
 typeSelect.addEventListener("change", () => {
+  if (typeSelect.value === "gallery" && !galleryNameConfirmed) {
+    galleryNameInput.value = DEFAULT_GALLERY_NAME;
+  }
   updateTypeDependentUi();
   renderEntries(typeSelect.value);
 });
@@ -1015,9 +1084,12 @@ addEntryBtn.addEventListener("click", () => {
 
 generateBtn.addEventListener("click", validateAndGenerate);
 loadOnlineBtn.addEventListener("click", loadOnlineJson);
+confirmGalleryBtn.addEventListener("click", confirmGalleryName);
 
 galleryNameInput.addEventListener("input", () => {
-  if (typeSelect.value === "gallery") resetValidationUi();
+  if (typeSelect.value !== "gallery") return;
+  updateGalleryConfirmationState();
+  resetValidationUi();
 });
 
 copyBtn.addEventListener("click", async () => {
@@ -1042,7 +1114,7 @@ downloadBtn.addEventListener("click", () => {
   a.href = URL.createObjectURL(blob);
 
   if (typeSelect.value === "gallery") {
-    const galleryName = galleryNameInput.value.trim() || "home-gallery";
+    const galleryName = confirmedGalleryName || normalizeGalleryName(galleryNameInput.value) || DEFAULT_GALLERY_NAME;
     a.download = `${galleryName}.json`;
   } else {
     a.download = specs[typeSelect.value].filename;
