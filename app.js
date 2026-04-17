@@ -2,6 +2,16 @@ const CONFIG = {
   DEFAULT_BASE_URL: "https://richti03.github.io/skvstatic"
 };
 
+const linkLabelOptions = [
+  { value: "", label: "Bitte wählen", type: "" },
+  { value: "Mehr", label: "Mehr", type: "more" },
+  { value: "Instagram", label: "Instagram", type: "instagram" },
+  { value: "Facebook", label: "Facebook", type: "facebook" },
+  { value: "TikTok", label: "TikTok", type: "tiktok" },
+  { value: "E-Mail", label: "E-Mail", type: "mail" },
+  { value: "Maps", label: "Maps", type: "maps" }
+];
+
 const specs = {
   news: {
     filename: "news.json",
@@ -17,8 +27,7 @@ const specs = {
         name: "links",
         type: "list",
         itemFields: [
-          { name: "type", type: "text" },
-          { name: "label", type: "text" },
+          { name: "label", type: "select", options: linkLabelOptions },
           { name: "url", type: "text", required: true }
         ]
       }
@@ -50,8 +59,7 @@ const specs = {
         name: "links",
         type: "list",
         itemFields: [
-          { name: "type", type: "text" },
-          { name: "label", type: "text" },
+          { name: "label", type: "select", options: linkLabelOptions },
           { name: "url", type: "text", required: true }
         ]
       }
@@ -275,6 +283,16 @@ function createInput(field, value) {
     input = document.createElement("input");
     input.type = "datetime-local";
     input.value = toInputValue(normalizedValue, field.type);
+  } else if (field.type === "select") {
+    input = document.createElement("select");
+    const options = Array.isArray(field.options) ? field.options : [];
+    options.forEach((option) => {
+      const optionEl = document.createElement("option");
+      optionEl.value = option.value;
+      optionEl.textContent = option.label;
+      input.append(optionEl);
+    });
+    input.value = String(normalizedValue ?? "");
   } else {
     input = document.createElement("input");
     input.type = "text";
@@ -327,8 +345,14 @@ function addListItem(field, container, value = {}) {
         ]
       : field.itemFields;
 
+  const normalizedValue = { ...value };
+  if (field.name === "links" && !normalizedValue.label && normalizedValue.type) {
+    const matchingOption = linkLabelOptions.find((option) => option.type === normalizedValue.type);
+    if (matchingOption) normalizedValue.label = matchingOption.value;
+  }
+
   definition.forEach((subField) => {
-    const { wrapper, input } = createInput(subField, value[subField.name]);
+    const { wrapper, input } = createInput(subField, normalizedValue[subField.name]);
     input.dataset.subField = subField.name;
     input.dataset.required = String(!!subField.required);
     item.append(wrapper);
@@ -399,7 +423,7 @@ function createListBlock(field, value = []) {
 function readEntry(entryEl) {
   const data = {};
 
-  entryEl.querySelectorAll("input[data-field], textarea[data-field]").forEach((input) => {
+  entryEl.querySelectorAll("input[data-field], textarea[data-field], select[data-field]").forEach((input) => {
     const name = input.dataset.field;
     const type = input.dataset.fieldType;
 
@@ -460,6 +484,15 @@ function readEntry(entryEl) {
 
     if (items.length > 0) data[fieldName] = items;
     else if (blockType === "pairList" && block.dataset.required === "true") data[fieldName] = [];
+
+    if (fieldName === "links" && Array.isArray(data[fieldName])) {
+      data[fieldName] = data[fieldName].map((item) => {
+        const linkLabel = item.label || "";
+        const matchingOption = linkLabelOptions.find((option) => option.value === linkLabel);
+        if (!matchingOption || !matchingOption.type) return item;
+        return { ...item, type: matchingOption.type };
+      });
+    }
   });
 
   if (typeSelect.value === "news") {
