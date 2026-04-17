@@ -423,7 +423,7 @@ Bildauflistung für Galerien.
     "links": [
       {
         "type": "more",
-        "label": "Mehr",
+        "label": "Mehr erfahren",
         "url": "https://example.org"
       }
     ]

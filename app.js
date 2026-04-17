@@ -4,7 +4,7 @@ const CONFIG = {
 
 const linkLabelOptions = [
   { value: "", label: "Bitte wählen", type: "" },
-  { value: "Mehr", label: "Mehr", type: "more" },
+  { value: "Mehr", label: "Mehr erfahren", type: "more" },
   { value: "Instagram", label: "Instagram", type: "instagram" },
   { value: "Facebook", label: "Facebook", type: "facebook" },
   { value: "TikTok", label: "TikTok", type: "tiktok" },
@@ -59,7 +59,7 @@ const specs = {
         name: "links",
         type: "list",
         itemFields: [
-          { name: "label", type: "select", options: linkLabelOptions },
+          { name: "label", type: "select", required: true, options: linkLabelOptions },
           { name: "url", type: "text", required: true }
         ]
       }
@@ -70,7 +70,7 @@ const specs = {
       text: "Text der News",
       publishAt: "2026-12-01-00:00",
       deleteAt: "2027-01-31-23:59",
-      links: [{ type: "more", label: "Mehr", url: "https://example.org" }]
+      links: [{ type: "more", label: "Mehr erfahren", url: "https://example.org" }]
     }
   },
   events: {
@@ -91,7 +91,7 @@ const specs = {
         name: "links",
         type: "list",
         itemFields: [
-          { name: "label", type: "select", options: linkLabelOptions },
+          { name: "label", type: "select", required: true, options: linkLabelOptions },
           { name: "url", type: "text", required: true }
         ]
       }
@@ -225,6 +225,20 @@ Object.keys(specs).forEach((key) => appendOption(key));
 
 const dateRegex = /^\d{2}\.\d{2}\.\d{4}$/;
 const windowRegex = /^\d{4}-\d{2}-\d{2}-\d{2}:\d{2}$/;
+
+function findLinkOptionByType(typeValue) {
+  if (typeof typeValue !== "string") return null;
+  let normalizedType = typeValue.trim().toLowerCase();
+  if (normalizedType.startsWith("type=")) normalizedType = normalizedType.slice(5).trim();
+  if (!normalizedType) return null;
+
+  return (
+    linkLabelOptions.find((option) => option.type.toLowerCase() === normalizedType) ||
+    linkLabelOptions.find((option) => option.value.toLowerCase() === normalizedType) ||
+    linkLabelOptions.find((option) => option.label.toLowerCase() === normalizedType) ||
+    null
+  );
+}
 
 function formatDateWindow(value) {
   return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}-${String(value.getUTCDate()).padStart(2, "0")}-${String(value.getUTCHours()).padStart(2, "0")}:${String(value.getUTCMinutes()).padStart(2, "0")}`;
@@ -534,8 +548,11 @@ function addListItem(field, container, value = {}, onChange = () => {}) {
       : field.itemFields;
 
   const normalizedValue = { ...value };
-  if (field.name === "links" && !normalizedValue.label && normalizedValue.type) {
-    const matchingOption = linkLabelOptions.find((option) => option.type === normalizedValue.type);
+  if (field.name === "links") {
+    const hasValidLabel = linkLabelOptions.some((option) => option.value === normalizedValue.label);
+    const matchingOption = hasValidLabel
+      ? null
+      : findLinkOptionByType(normalizedValue.type) || findLinkOptionByType(normalizedValue.label);
     if (matchingOption) normalizedValue.label = matchingOption.value;
   }
 
