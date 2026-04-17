@@ -168,34 +168,14 @@ const copyBtn = document.querySelector("#copyBtn");
 const downloadBtn = document.querySelector("#downloadBtn");
 const resultActions = document.querySelector("#resultActions");
 
-const typeOrder = {
-  oben: ["news", "royals"],
-  unten: ["events", "vorstand", "elferrat", "linktree"]
-};
-
-function appendOption(key, parent = typeSelect) {
-  if (!specs[key]) return;
+function appendOption(key) {
   const opt = document.createElement("option");
   opt.value = key;
   opt.textContent = `${key} (${specs[key].filename})`;
-  parent.append(opt);
+  typeSelect.append(opt);
 }
 
-const obenGroup = document.createElement("optgroup");
-obenGroup.label = "Oben";
-typeOrder.oben.forEach((key) => appendOption(key, obenGroup));
-
-const untenGroup = document.createElement("optgroup");
-untenGroup.label = "Unten";
-typeOrder.unten.forEach((key) => appendOption(key, untenGroup));
-
-typeSelect.append(obenGroup, untenGroup);
-
-Object.keys(specs).forEach((key) => {
-  const alreadyRendered =
-    typeOrder.oben.includes(key) || typeOrder.unten.includes(key);
-  if (!alreadyRendered) appendOption(key);
-});
+Object.keys(specs).forEach((key) => appendOption(key));
 
 const dateRegex = /^\d{2}\.\d{2}\.\d{4}$/;
 const windowRegex = /^\d{4}-\d{2}-\d{2}-\d{2}:\d{2}$/;
@@ -592,9 +572,10 @@ function moveEntry(entryEl, direction) {
   resetValidationUi();
 }
 
-function addEntry(defaults = {}, { expand = true } = {}) {
+function addEntry(defaults = {}, { expand = true, insert = "auto" } = {}) {
   const typeKey = typeSelect.value;
   const spec = specs[typeKey];
+  const shouldPrepend = insert === "start" || (insert === "auto" && (typeKey === "news" || typeKey === "royals"));
 
   const entry = document.createElement("article");
   entry.className = "entry";
@@ -671,7 +652,8 @@ function addEntry(defaults = {}, { expand = true } = {}) {
   });
 
   entry.append(header, body);
-  entriesEl.append(entry);
+  if (shouldPrepend) entriesEl.prepend(entry);
+  else entriesEl.append(entry);
 
   if (expand) expandEntry(entry);
   else collapseAllEntries();
@@ -699,7 +681,7 @@ function renderEntries(typeKey, dataList = null) {
   const spec = specs[typeKey];
   const defaults = Array.isArray(dataList) && dataList.length > 0 ? dataList : [spec.template];
 
-  defaults.forEach((item, index) => addEntry(item, { expand: index === 0 }));
+  defaults.forEach((item, index) => addEntry(item, { expand: index === 0, insert: "end" }));
   if (defaults.length > 1) collapseAllEntries();
   renumberAndRefreshSummaries();
 }
