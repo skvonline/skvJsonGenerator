@@ -1130,7 +1130,7 @@ function getOutputJson() {
 
 function setCommitStatus(text, state = "") {
   if (!commitStatus) return;
-  commitStatus.textContent = text;
+  commitStatus.innerHTML = text;
   commitStatus.classList.remove("is-success", "is-error");
   if (state === "success") commitStatus.classList.add("is-success");
   if (state === "error") commitStatus.classList.add("is-error");
@@ -1328,7 +1328,7 @@ async function commitGeneratedJson() {
     const result = await response.json();
     const commitUrl = result?.commit?.html_url || "";
     const statusText = commitUrl
-      ? `Commit erfolgreich: ${commitUrl}`
+      ? `Commit erfolgreich: <a href="https://github.com/richti03/skvstatic/compare/SkvJsonGenerator" target="_blank">${commitUrl}</a>`
       : "Commit erfolgreich erstellt.";
     setCommitStatus(statusText, "success");
   } catch (error) {
