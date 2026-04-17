@@ -10,7 +10,7 @@ const specs = {
       { name: "title", type: "text", required: true },
       { name: "date", type: "text", required: true, placeholder: "TT.MM.JJJJ" },
       { name: "text", type: "textarea", required: true },
-      { name: "image", type: "text" },
+      { name: "image", type: "text", filenameOnly: true, pathPrefix: "./src/img/news/" },
       { name: "publishAt", type: "text", placeholder: "JJJJ-MM-TT-HH:mm" },
       { name: "deleteAt", type: "text", required: true, placeholder: "JJJJ-MM-TT-HH:mm" },
       { name: "large", type: "checkbox" },
@@ -44,7 +44,7 @@ const specs = {
       { name: "preis", type: "text" },
       { name: "location", type: "text" },
       { name: "description", type: "textarea" },
-      { name: "image", type: "text" },
+      { name: "image", type: "text", filenameOnly: true, pathPrefix: "./src/img/events/" },
       { name: "publishAt", type: "text", placeholder: "JJJJ-MM-TT-HH:mm" },
       { name: "deleteAt", type: "text", required: true, placeholder: "JJJJ-MM-TT-HH:mm" },
       {
@@ -72,7 +72,7 @@ const specs = {
     fields: [
       { name: "name", type: "text", required: true },
       { name: "role", type: "text", required: true },
-      { name: "image", type: "text", required: true },
+      { name: "image", type: "text", required: true, filenameOnly: true, pathPrefix: "src/img/verein/vorstand/" },
       { name: "tags", type: "csv", required: true, placeholder: "Tag1, Tag2" },
       { name: "description", type: "textarea", required: true },
       {
@@ -102,7 +102,7 @@ const specs = {
     fields: [
       { name: "name", type: "text", required: true },
       { name: "role", type: "text", required: true },
-      { name: "image", type: "text", required: true }
+      { name: "image", type: "text", required: true, filenameOnly: true, pathPrefix: "./src/img/verein/elferrat/" }
     ],
     template: {
       name: "Erika Muster",
@@ -116,7 +116,7 @@ const specs = {
     fields: [
       { name: "session", type: "text", required: true },
       { name: "year", type: "text", required: true },
-      { name: "image", type: "text", required: true },
+      { name: "image", type: "text", required: true, filenameOnly: true, pathPrefix: "./src/img/verein/prinzenpaare/" },
       { name: "adultPair", type: "pairList", required: true },
       { name: "childPair", type: "pairList" }
     ],
@@ -145,7 +145,7 @@ const specs = {
     filename: "gallerys/{xyz}.json",
     summaryKeys: ["src", "alt"],
     fields: [
-      { name: "src", type: "text", required: true },
+      { name: "src", type: "text", required: true, filenameOnly: true, pathPrefix: "./src/img/home-gallery/" },
       { name: "alt", type: "text" }
     ],
     template: {
@@ -203,6 +203,13 @@ function toInputValue(value, fieldType) {
   return value ?? "";
 }
 
+function getFilenameOnly(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.split(/[\\/]/).pop() || "";
+}
+
 function createInput(field, value) {
   const wrapper = document.createElement("div");
   wrapper.className = "form-field";
@@ -212,24 +219,41 @@ function createInput(field, value) {
   wrapper.append(label);
 
   let input;
+  const normalizedValue = field.filenameOnly ? getFilenameOnly(value) : value;
+
   if (field.type === "textarea") {
     input = document.createElement("textarea");
-    input.value = toInputValue(value, field.type);
+    input.value = toInputValue(normalizedValue, field.type);
   } else if (field.type === "checkbox") {
     input = document.createElement("input");
     input.type = "checkbox";
-    input.checked = toInputValue(value, field.type);
+    input.checked = toInputValue(normalizedValue, field.type);
   } else {
     input = document.createElement("input");
     input.type = "text";
-    input.value = toInputValue(value, field.type);
+    input.value = toInputValue(normalizedValue, field.type);
   }
 
   if (field.placeholder) input.placeholder = field.placeholder;
   input.dataset.field = field.name;
   input.dataset.fieldType = field.type;
   input.dataset.required = String(!!field.required);
-  wrapper.append(input);
+
+  if (field.filenameOnly && field.pathPrefix && field.type !== "textarea" && field.type !== "checkbox") {
+    const inputWithPrefix = document.createElement("div");
+    inputWithPrefix.className = "input-with-prefix";
+
+    const prefix = document.createElement("span");
+    prefix.className = "input-prefix";
+    prefix.textContent = field.pathPrefix;
+    inputWithPrefix.append(prefix, input);
+    wrapper.append(inputWithPrefix);
+  } else {
+    wrapper.append(input);
+  }
+
+  if (field.filenameOnly) input.dataset.filenameOnly = "true";
+  if (field.pathPrefix) input.dataset.pathPrefix = field.pathPrefix;
 
   return { wrapper, input };
 }
@@ -346,8 +370,20 @@ function readEntry(entryEl) {
     const value = input.value.trim();
     if (!value) return;
 
-    if (type === "csv") data[name] = value.split(",").map((part) => part.trim()).filter(Boolean);
-    else data[name] = value;
+    if (type === "csv") {
+      data[name] = value.split(",").map((part) => part.trim()).filter(Boolean);
+      return;
+    }
+
+    if (input.dataset.filenameOnly === "true") {
+      const filename = getFilenameOnly(value);
+      if (!filename) return;
+      const prefix = input.dataset.pathPrefix || "";
+      data[name] = `${prefix}${filename}`;
+      return;
+    }
+
+    data[name] = value;
   });
 
   entryEl.querySelectorAll(".list-block[data-field]").forEach((block) => {
