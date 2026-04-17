@@ -2,6 +2,26 @@ const CONFIG = {
   DEFAULT_BASE_URL: "https://richti03.github.io/skvstatic"
 };
 
+const linkTypeOptions = [
+  { value: "", label: "Bitte wählen" },
+  { value: "more", label: "more" },
+  { value: "instagram", label: "instagram" },
+  { value: "facebook", label: "facebook" },
+  { value: "tiktok", label: "tiktok" },
+  { value: "mail", label: "mail" },
+  { value: "maps", label: "maps" }
+];
+
+const linkLabelOptions = [
+  { value: "", label: "Bitte wählen" },
+  { value: "Mehr", label: "Mehr" },
+  { value: "Instagram", label: "Instagram" },
+  { value: "Facebook", label: "Facebook" },
+  { value: "TikTok", label: "TikTok" },
+  { value: "E-Mail", label: "E-Mail" },
+  { value: "Maps", label: "Maps" }
+];
+
 const specs = {
   news: {
     filename: "news.json",
@@ -17,8 +37,8 @@ const specs = {
         name: "links",
         type: "list",
         itemFields: [
-          { name: "type", type: "text" },
-          { name: "label", type: "text" },
+          { name: "type", type: "select", options: linkTypeOptions },
+          { name: "label", type: "select", options: linkLabelOptions },
           { name: "url", type: "text", required: true }
         ]
       }
@@ -50,8 +70,8 @@ const specs = {
         name: "links",
         type: "list",
         itemFields: [
-          { name: "type", type: "text" },
-          { name: "label", type: "text" },
+          { name: "type", type: "select", options: linkTypeOptions },
+          { name: "label", type: "select", options: linkLabelOptions },
           { name: "url", type: "text", required: true }
         ]
       }
@@ -275,6 +295,16 @@ function createInput(field, value) {
     input = document.createElement("input");
     input.type = "datetime-local";
     input.value = toInputValue(normalizedValue, field.type);
+  } else if (field.type === "select") {
+    input = document.createElement("select");
+    const options = Array.isArray(field.options) ? field.options : [];
+    options.forEach((option) => {
+      const optionEl = document.createElement("option");
+      optionEl.value = option.value;
+      optionEl.textContent = option.label;
+      input.append(optionEl);
+    });
+    input.value = String(normalizedValue ?? "");
   } else {
     input = document.createElement("input");
     input.type = "text";
@@ -399,7 +429,7 @@ function createListBlock(field, value = []) {
 function readEntry(entryEl) {
   const data = {};
 
-  entryEl.querySelectorAll("input[data-field], textarea[data-field]").forEach((input) => {
+  entryEl.querySelectorAll("input[data-field], textarea[data-field], select[data-field]").forEach((input) => {
     const name = input.dataset.field;
     const type = input.dataset.fieldType;
 
