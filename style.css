@@ -77,6 +77,30 @@ select {
   background: #ffffff;
 }
 
+.input-with-prefix {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  border: 1px solid #8cb3ea;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.input-prefix {
+  padding: 0.45rem 0.55rem;
+  background: #eff6ff;
+  border-right: 1px solid #8cb3ea;
+  color: #154b95;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.82rem;
+}
+
+.input-with-prefix input {
+  border: 0;
+  border-radius: 0;
+}
+
 .form-field.has-error label,
 .list-block.has-error .list-block-title {
   color: #b91c1c;
@@ -84,6 +108,7 @@ select {
 
 .form-field.has-error input,
 .form-field.has-error textarea,
+.form-field.has-error .input-with-prefix,
 .list-block.has-error {
   border-color: #dc2626;
   box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
