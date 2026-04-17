@@ -13,7 +13,6 @@ const specs = {
       { name: "image", type: "text", filenameOnly: true, pathPrefix: "./src/img/news/" },
       { name: "publishAt", type: "datetime", placeholder: "JJJJ-MM-TT-HH:mm" },
       { name: "deleteAt", type: "datetime", required: true, placeholder: "JJJJ-MM-TT-HH:mm", allowAuto: true },
-      { name: "large", type: "checkbox" },
       {
         name: "links",
         type: "list",
@@ -462,6 +461,10 @@ function readEntry(entryEl) {
     if (items.length > 0) data[fieldName] = items;
     else if (blockType === "pairList" && block.dataset.required === "true") data[fieldName] = [];
   });
+
+  if (typeSelect.value === "news") {
+    data.large = Boolean(data.image);
+  }
 
   return data;
 }
