@@ -59,7 +59,7 @@ const specs = {
         name: "links",
         type: "list",
         itemFields: [
-          { name: "label", type: "select", options: linkLabelOptions },
+          { name: "label", type: "select", required: true, options: linkLabelOptions },
           { name: "url", type: "text", required: true }
         ]
       }
@@ -91,7 +91,7 @@ const specs = {
         name: "links",
         type: "list",
         itemFields: [
-          { name: "label", type: "select", options: linkLabelOptions },
+          { name: "label", type: "select", required: true, options: linkLabelOptions },
           { name: "url", type: "text", required: true }
         ]
       }
