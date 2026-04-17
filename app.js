@@ -36,6 +36,14 @@ const vorstandSocialIconOptions = [
   { value: "♪", label: "♪" }
 ];
 
+const linktreeIconOptions = [
+  { value: "", label: "Bitte wählen" },
+  { value: "website", label: "website" },
+  { value: "instagram", label: "instagram" },
+  { value: "facebook", label: "facebook" },
+  { value: "download", label: "download" }
+];
+
 const specs = {
   news: {
     filename: "news.json",
@@ -162,7 +170,7 @@ const specs = {
     filename: "linktree.json",
     summaryKeys: ["text", "url"],
     fields: [
-      { name: "icon", type: "text", placeholder: "website|instagram|facebook|download" },
+      { name: "icon", type: "select", required: true, options: linktreeIconOptions },
       { name: "text", type: "text", required: true },
       { name: "url", type: "text", required: true }
     ],
