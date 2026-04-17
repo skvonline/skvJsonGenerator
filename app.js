@@ -166,6 +166,7 @@ const addEntryBtn = document.querySelector("#addEntryBtn");
 const generateBtn = document.querySelector("#generateBtn");
 const copyBtn = document.querySelector("#copyBtn");
 const downloadBtn = document.querySelector("#downloadBtn");
+const resultActions = document.querySelector("#resultActions");
 
 Object.keys(specs).forEach((key) => {
   const opt = document.createElement("option");
@@ -181,6 +182,17 @@ function updateTypeDependentUi() {
   galleryNameWrap.classList.toggle("hidden", typeSelect.value !== "gallery");
 }
 
+function clearResult() {
+  outputEl.textContent = "";
+  resultActions.classList.add("hidden");
+}
+
+function resetValidationUi() {
+  validationList.innerHTML = "";
+  entriesEl.querySelectorAll(".has-error").forEach((el) => el.classList.remove("has-error"));
+  clearResult();
+}
+
 function toInputValue(value, fieldType) {
   if (fieldType === "csv") return Array.isArray(value) ? value.join(", ") : "";
   if (fieldType === "checkbox") return !!value;
@@ -189,6 +201,8 @@ function toInputValue(value, fieldType) {
 
 function createInput(field, value) {
   const wrapper = document.createElement("div");
+  wrapper.className = "form-field";
+
   const label = document.createElement("label");
   label.textContent = `${field.name}${field.required ? " *" : ""}`;
   wrapper.append(label);
@@ -224,7 +238,7 @@ function addListItem(field, container, value = {}) {
   removeBtn.textContent = "Entfernen";
   removeBtn.addEventListener("click", () => {
     item.remove();
-    generateJson();
+    resetValidationUi();
   });
   item.append(removeBtn);
 
@@ -254,6 +268,7 @@ function createListBlock(field, value = []) {
   header.className = "list-block-header";
 
   const title = document.createElement("p");
+  title.className = "list-block-title";
   title.innerHTML = `<strong>${field.name}${field.required ? " *" : ""}</strong>`;
   header.append(title);
 
@@ -289,7 +304,7 @@ function createListBlock(field, value = []) {
   addBtn.addEventListener("click", () => {
     setCollapsed(false);
     addListItem(field, listContainer);
-    generateJson();
+    resetValidationUi();
   });
   content.append(addBtn);
 
@@ -351,61 +366,111 @@ function parseDateWindow(value) {
   return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)));
 }
 
-function validate(entries, typeKey) {
-  const checks = [];
-  const spec = specs[typeKey];
-
-  checks.push({ ok: Array.isArray(entries), text: "Top-Level ist ein Array" });
-
-  entries.forEach((entry, idx) => {
-    spec.fields.forEach((field) => {
-      if (!field.required) return;
-      const hasValue =
-        field.type === "checkbox"
-          ? entry[field.name] === true
-          : Array.isArray(entry[field.name])
-            ? entry[field.name].length > 0
-            : !!entry[field.name];
-
-      checks.push({ ok: hasValue, text: `Eintrag ${idx + 1}: Pflichtfeld '${field.name}' ist gesetzt` });
-    });
-
-    if (entry.date) checks.push({ ok: dateRegex.test(entry.date), text: `Eintrag ${idx + 1}: date hat Format TT.MM.JJJJ` });
-    if (entry.publishAt) checks.push({ ok: windowRegex.test(entry.publishAt), text: `Eintrag ${idx + 1}: publishAt hat Format JJJJ-MM-TT-HH:mm` });
-    if (entry.deleteAt) checks.push({ ok: windowRegex.test(entry.deleteAt), text: `Eintrag ${idx + 1}: deleteAt hat Format JJJJ-MM-TT-HH:mm` });
-
-    if (entry.publishAt && entry.deleteAt && windowRegex.test(entry.publishAt) && windowRegex.test(entry.deleteAt)) {
-      checks.push({
-        ok: parseDateWindow(entry.publishAt) < parseDateWindow(entry.deleteAt),
-        text: `Eintrag ${idx + 1}: publishAt liegt vor deleteAt`
-      });
-    }
-
-    if (Array.isArray(entry.links)) {
-      entry.links.forEach((link, linkIdx) => {
-        checks.push({ ok: !!link.url, text: `Eintrag ${idx + 1}, Link ${linkIdx + 1}: url ist gesetzt` });
-      });
-    }
-  });
-
-  return checks;
+function markFieldError(element) {
+  const wrapper = element.closest(".form-field") || element;
+  wrapper.classList.add("has-error");
 }
 
-function renderValidation(checks) {
-  validationList.innerHTML = "";
-  checks.forEach((check) => {
-    const li = document.createElement("li");
-    li.className = check.ok ? "ok" : "err";
-    li.textContent = `${check.ok ? "✔" : "✖"} ${check.text}`;
-    validationList.append(li);
+function validate(entries, typeKey) {
+  const errors = [];
+  const spec = specs[typeKey];
+
+  if (!Array.isArray(entries)) {
+    errors.push({ text: "Top-Level ist kein Array." });
+    return errors;
+  }
+
+  entries.forEach((entry, idx) => {
+    const entryEl = entriesEl.querySelectorAll(".entry")[idx];
+
+    spec.fields.forEach((field) => {
+      if (field.type === "list" || field.type === "pairList") {
+        const block = entryEl.querySelector(`.list-block[data-field="${field.name}"]`);
+        const items = Array.isArray(entry[field.name]) ? entry[field.name] : [];
+
+        if (field.required && items.length === 0) {
+          errors.push({ text: `Eintrag ${idx + 1}: Pflichtfeld '${field.name}' fehlt.`, element: block });
+        }
+
+        const itemDefs = field.type === "pairList"
+          ? [
+              { name: "prince", required: true },
+              { name: "princess", required: true }
+            ]
+          : field.itemFields || [];
+
+        block.querySelectorAll(".list-item").forEach((itemEl, itemIdx) => {
+          itemDefs.forEach((subField) => {
+            if (!subField.required) return;
+            const subInput = itemEl.querySelector(`[data-sub-field="${subField.name}"]`);
+            if (subInput && !subInput.value.trim()) {
+              errors.push({ text: `Eintrag ${idx + 1}, ${field.name} ${itemIdx + 1}: '${subField.name}' fehlt.`, element: subInput });
+            }
+          });
+        });
+
+        return;
+      }
+
+      if (!field.required) return;
+
+      const input = entryEl.querySelector(`[data-field="${field.name}"]`);
+      const hasValue = field.type === "checkbox" ? input.checked : !!input.value.trim();
+      if (!hasValue) {
+        errors.push({ text: `Eintrag ${idx + 1}: Pflichtfeld '${field.name}' ist leer.`, element: input });
+      }
+    });
+
+    if (entry.date && !dateRegex.test(entry.date)) {
+      const input = entryEl.querySelector('[data-field="date"]');
+      errors.push({ text: `Eintrag ${idx + 1}: date hat nicht das Format TT.MM.JJJJ.`, element: input });
+    }
+
+    if (entry.publishAt && !windowRegex.test(entry.publishAt)) {
+      const input = entryEl.querySelector('[data-field="publishAt"]');
+      errors.push({ text: `Eintrag ${idx + 1}: publishAt hat nicht das Format JJJJ-MM-TT-HH:mm.`, element: input });
+    }
+
+    if (entry.deleteAt && !windowRegex.test(entry.deleteAt)) {
+      const input = entryEl.querySelector('[data-field="deleteAt"]');
+      errors.push({ text: `Eintrag ${idx + 1}: deleteAt hat nicht das Format JJJJ-MM-TT-HH:mm.`, element: input });
+    }
+
+    if (entry.publishAt && entry.deleteAt && windowRegex.test(entry.publishAt) && windowRegex.test(entry.deleteAt)) {
+      if (parseDateWindow(entry.publishAt) >= parseDateWindow(entry.deleteAt)) {
+        const publishInput = entryEl.querySelector('[data-field="publishAt"]');
+        const deleteInput = entryEl.querySelector('[data-field="deleteAt"]');
+        errors.push({ text: `Eintrag ${idx + 1}: publishAt muss vor deleteAt liegen.`, element: publishInput });
+        errors.push({ text: `Eintrag ${idx + 1}: deleteAt muss nach publishAt liegen.`, element: deleteInput });
+      }
+    }
   });
 
-  if (checks.length === 0) {
+  return errors;
+}
+
+function renderValidation(errors) {
+  validationList.innerHTML = "";
+
+  if (errors.length === 0) {
     const li = document.createElement("li");
-    li.className = "warn";
-    li.textContent = "Keine Einträge vorhanden.";
+    li.className = "ok";
+    li.textContent = "✔ Keine Fehler gefunden. JSON wurde erstellt.";
     validationList.append(li);
+    return;
   }
+
+  errors.forEach((error) => {
+    const li = document.createElement("li");
+    li.className = "err";
+    li.textContent = `✖ ${error.text}`;
+    validationList.append(li);
+
+    if (error.element) {
+      if (error.element.classList.contains("list-block")) error.element.classList.add("has-error");
+      else markFieldError(error.element);
+    }
+  });
 }
 
 function collapseAllEntries() {
@@ -482,7 +547,7 @@ function addEntry(defaults = {}, { expand = true } = {}) {
   deleteBtn.addEventListener("click", () => {
     entry.remove();
     renumberAndRefreshSummaries();
-    generateJson();
+    resetValidationUi();
   });
 
   actions.append(editBtn, doneBtn, deleteBtn);
@@ -507,25 +572,31 @@ function addEntry(defaults = {}, { expand = true } = {}) {
   else collapseAllEntries();
 
   renumberAndRefreshSummaries();
-  generateJson();
 }
 
-function generateJson() {
+function validateAndGenerate() {
+  resetValidationUi();
+
   const entries = [...entriesEl.querySelectorAll(".entry")].map(readEntry);
-  const checks = validate(entries, typeSelect.value);
-  renderValidation(checks);
-  outputEl.textContent = JSON.stringify(entries, null, 2);
+  const errors = validate(entries, typeSelect.value);
+  renderValidation(errors);
+
+  if (errors.length === 0) {
+    outputEl.textContent = JSON.stringify(entries, null, 2);
+    resultActions.classList.remove("hidden");
+  }
 }
 
 function renderEntries(typeKey, dataList = null) {
   entriesEl.innerHTML = "";
+  resetValidationUi();
+
   const spec = specs[typeKey];
   const defaults = Array.isArray(dataList) && dataList.length > 0 ? dataList : [spec.template];
 
   defaults.forEach((item, index) => addEntry(item, { expand: index === 0 }));
   if (defaults.length > 1) collapseAllEntries();
   renumberAndRefreshSummaries();
-  generateJson();
 }
 
 function getFetchUrl() {
@@ -570,16 +641,20 @@ typeSelect.addEventListener("change", () => {
   renderEntries(typeSelect.value);
 });
 
-addEntryBtn.addEventListener("click", () => addEntry());
-generateBtn.addEventListener("click", generateJson);
+addEntryBtn.addEventListener("click", () => {
+  addEntry();
+  resetValidationUi();
+});
+
+generateBtn.addEventListener("click", validateAndGenerate);
 loadOnlineBtn.addEventListener("click", loadOnlineJson);
 
 galleryNameInput.addEventListener("input", () => {
-  if (typeSelect.value === "gallery") generateJson();
+  if (typeSelect.value === "gallery") resetValidationUi();
 });
 
 copyBtn.addEventListener("click", async () => {
-  if (!outputEl.textContent.trim()) generateJson();
+  if (!outputEl.textContent.trim()) return;
   try {
     await navigator.clipboard.writeText(outputEl.textContent);
     copyBtn.textContent = "Kopiert";
@@ -593,7 +668,7 @@ copyBtn.addEventListener("click", async () => {
 });
 
 downloadBtn.addEventListener("click", () => {
-  if (!outputEl.textContent.trim()) generateJson();
+  if (!outputEl.textContent.trim()) return;
 
   const blob = new Blob([outputEl.textContent], { type: "application/json;charset=utf-8" });
   const a = document.createElement("a");
@@ -616,7 +691,7 @@ entriesEl.addEventListener("input", (event) => {
     const index = [...entriesEl.querySelectorAll(".entry")].indexOf(entryEl);
     refreshEntrySummary(entryEl, index);
   }
-  generateJson();
+  resetValidationUi();
 });
 
 typeSelect.value = "news";
