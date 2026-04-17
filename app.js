@@ -396,10 +396,16 @@ function updateImagePreviewForInput(input) {
   if (!filename || !pathPrefix) {
     previewEl.classList.add("hidden");
     previewEl.removeAttribute("src");
+    delete previewEl.dataset.fallbackSrc;
     return;
   }
 
-  previewEl.src = `${pathPrefix}${filename}`;
+  const relativeSrc = `${pathPrefix}${filename}`;
+  const normalizedRelative = relativeSrc.replace(/^\.\//, "");
+  const absoluteSrc = `${CONFIG.DEFAULT_BASE_URL.replace(/\/$/, "")}/${normalizedRelative}`;
+
+  previewEl.dataset.fallbackSrc = relativeSrc;
+  previewEl.src = absoluteSrc;
   previewEl.alt = `Vorschau ${filename}`;
   previewEl.classList.remove("hidden");
 }
@@ -488,8 +494,15 @@ function createInput(field, value) {
     preview.decoding = "async";
     preview.alt = "Bildvorschau";
     preview.addEventListener("error", () => {
+      const fallbackSrc = preview.dataset.fallbackSrc;
+      if (fallbackSrc && preview.src !== fallbackSrc) {
+        preview.src = fallbackSrc;
+        delete preview.dataset.fallbackSrc;
+        return;
+      }
       preview.classList.add("hidden");
       preview.removeAttribute("src");
+      delete preview.dataset.fallbackSrc;
     });
     wrapper.append(preview);
     updateImagePreviewForInput(input);
