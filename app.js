@@ -8,11 +8,11 @@ const specs = {
     summaryKeys: ["title", "date"],
     fields: [
       { name: "title", type: "text", required: true },
-      { name: "date", type: "text", required: true, placeholder: "TT.MM.JJJJ" },
+      { name: "date", type: "date", required: true },
       { name: "text", type: "textarea", required: true },
       { name: "image", type: "text", filenameOnly: true, pathPrefix: "./src/img/news/" },
-      { name: "publishAt", type: "text", placeholder: "JJJJ-MM-TT-HH:mm" },
-      { name: "deleteAt", type: "text", required: true, placeholder: "JJJJ-MM-TT-HH:mm" },
+      { name: "publishAt", type: "datetime", placeholder: "JJJJ-MM-TT-HH:mm" },
+      { name: "deleteAt", type: "datetime", required: true, placeholder: "JJJJ-MM-TT-HH:mm", allowAuto: true },
       { name: "large", type: "checkbox" },
       {
         name: "links",
@@ -38,15 +38,15 @@ const specs = {
     summaryKeys: ["title", "date", "location"],
     fields: [
       { name: "title", type: "text", required: true },
-      { name: "date", type: "text", required: true, placeholder: "TT.MM.JJJJ" },
+      { name: "date", type: "date", required: true },
       { name: "time", type: "text" },
       { name: "einlass", type: "text" },
       { name: "preis", type: "text" },
       { name: "location", type: "text" },
       { name: "description", type: "textarea" },
       { name: "image", type: "text", filenameOnly: true, pathPrefix: "./src/img/events/" },
-      { name: "publishAt", type: "text", placeholder: "JJJJ-MM-TT-HH:mm" },
-      { name: "deleteAt", type: "text", required: true, placeholder: "JJJJ-MM-TT-HH:mm" },
+      { name: "publishAt", type: "datetime", placeholder: "JJJJ-MM-TT-HH:mm" },
+      { name: "deleteAt", type: "datetime", required: true, placeholder: "JJJJ-MM-TT-HH:mm" },
       {
         name: "links",
         type: "list",
@@ -180,6 +180,42 @@ Object.keys(specs).forEach((key) => appendOption(key));
 const dateRegex = /^\d{2}\.\d{2}\.\d{4}$/;
 const windowRegex = /^\d{4}-\d{2}-\d{2}-\d{2}:\d{2}$/;
 
+function formatDateWindow(value) {
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}-${String(value.getUTCDate()).padStart(2, "0")}-${String(value.getUTCHours()).padStart(2, "0")}:${String(value.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+function parseDate(value) {
+  if (!dateRegex.test(value)) return null;
+  const [day, month, year] = value.split(".");
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 0, 0, 0, 0));
+}
+
+function toDateInputValue(value) {
+  if (typeof value !== "string" || !dateRegex.test(value)) return "";
+  const [day, month, year] = value.split(".");
+  return `${year}-${month}-${day}`;
+}
+
+function fromDateInputValue(value) {
+  if (typeof value !== "string" || !value) return "";
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return "";
+  return `${day}.${month}.${year}`;
+}
+
+function toDateTimeInputValue(value) {
+  if (typeof value !== "string" || !windowRegex.test(value)) return "";
+  const [year, month, day, hm] = value.split("-");
+  return `${year}-${month}-${day}T${hm}`;
+}
+
+function fromDateTimeInputValue(value) {
+  if (typeof value !== "string" || !value.includes("T")) return "";
+  const [datePart, timePart] = value.split("T");
+  if (!datePart || !timePart) return "";
+  return `${datePart}-${timePart}`;
+}
+
 function updateTypeDependentUi() {
   galleryNameWrap.classList.toggle("hidden", typeSelect.value !== "gallery");
 }
@@ -198,6 +234,8 @@ function resetValidationUi() {
 function toInputValue(value, fieldType) {
   if (fieldType === "csv") return Array.isArray(value) ? value.join(", ") : "";
   if (fieldType === "checkbox") return !!value;
+  if (fieldType === "date") return toDateInputValue(value);
+  if (fieldType === "datetime") return toDateTimeInputValue(value);
   if (fieldType === "textarea") {
     if (Array.isArray(value)) return value.join("\n\n");
     if (value && typeof value === "object") return JSON.stringify(value, null, 2);
@@ -230,6 +268,14 @@ function createInput(field, value) {
     input = document.createElement("input");
     input.type = "checkbox";
     input.checked = toInputValue(normalizedValue, field.type);
+  } else if (field.type === "date") {
+    input = document.createElement("input");
+    input.type = "date";
+    input.value = toInputValue(normalizedValue, field.type);
+  } else if (field.type === "datetime") {
+    input = document.createElement("input");
+    input.type = "datetime-local";
+    input.value = toInputValue(normalizedValue, field.type);
   } else {
     input = document.createElement("input");
     input.type = "text";
@@ -256,6 +302,7 @@ function createInput(field, value) {
 
   if (field.filenameOnly) input.dataset.filenameOnly = "true";
   if (field.pathPrefix) input.dataset.pathPrefix = field.pathPrefix;
+  if (field.allowAuto) input.dataset.allowAuto = "true";
 
   return { wrapper, input };
 }
@@ -372,6 +419,16 @@ function readEntry(entryEl) {
     const value = input.value.trim();
     if (!value) return;
 
+    if (type === "date") {
+      data[name] = fromDateInputValue(value);
+      return;
+    }
+
+    if (type === "datetime") {
+      data[name] = fromDateTimeInputValue(value);
+      return;
+    }
+
     if (type === "csv") {
       data[name] = value.split(",").map((part) => part.trim()).filter(Boolean);
       return;
@@ -414,6 +471,37 @@ function parseDateWindow(value) {
   const [year, month, day, hm] = value.split("-");
   const [hour, minute] = hm.split(":");
   return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)));
+}
+
+function calculateNewsDeleteAt(entry) {
+  if (!entry || typeof entry !== "object") return null;
+
+  const publishDate = entry.publishAt ? parseDateWindow(entry.publishAt) : null;
+  const fallbackDate = entry.date ? parseDate(entry.date) : null;
+  const baseDate = publishDate || fallbackDate;
+  if (!baseDate) return null;
+
+  const targetDate = new Date(baseDate.getTime());
+  targetDate.setUTCDate(targetDate.getUTCDate() + 365);
+  targetDate.setUTCHours(23, 59, 0, 0);
+  return formatDateWindow(targetDate);
+}
+
+function updateNewsDeleteAt(entryEl) {
+  if (typeSelect.value !== "news") return;
+  const deleteInput = entryEl.querySelector('[data-field="deleteAt"]');
+  if (!deleteInput || deleteInput.dataset.allowAuto !== "true") return;
+
+  const isAuto = deleteInput.dataset.autoManaged === "true";
+  const isEmpty = !deleteInput.value.trim();
+  if (!isAuto && !isEmpty) return;
+
+  const draft = readEntry(entryEl);
+  const autoValue = calculateNewsDeleteAt(draft);
+  if (!autoValue) return;
+
+  deleteInput.value = toDateTimeInputValue(autoValue);
+  deleteInput.dataset.autoManaged = "true";
 }
 
 function markFieldError(element) {
@@ -668,7 +756,10 @@ function addEntry(defaults = {}, { expand = true, insert = "auto", scrollToEntry
 function validateAndGenerate() {
   resetValidationUi();
 
-  const entries = [...entriesEl.querySelectorAll(".entry")].map(readEntry);
+  const entries = [...entriesEl.querySelectorAll(".entry")].map((entryEl) => {
+    updateNewsDeleteAt(entryEl);
+    return readEntry(entryEl);
+  });
   const errors = validate(entries, typeSelect.value);
   renderValidation(errors);
 
@@ -793,6 +884,12 @@ downloadBtn.addEventListener("click", () => {
 entriesEl.addEventListener("input", (event) => {
   const entryEl = event.target.closest(".entry");
   if (entryEl) {
+    if (event.target.dataset.field === "deleteAt") {
+      event.target.dataset.autoManaged = "false";
+    }
+    if (event.target.dataset.field === "date" || event.target.dataset.field === "publishAt") {
+      updateNewsDeleteAt(entryEl);
+    }
     const index = [...entriesEl.querySelectorAll(".entry")].indexOf(entryEl);
     refreshEntrySummary(entryEl, index);
   }
