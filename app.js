@@ -4,7 +4,7 @@ const CONFIG = {
 
 const linkLabelOptions = [
   { value: "", label: "Bitte wählen", type: "" },
-  { value: "Mehr", label: "Mehr", type: "more" },
+  { value: "Mehr", label: "Mehr erfahren", type: "more" },
   { value: "Instagram", label: "Instagram", type: "instagram" },
   { value: "Facebook", label: "Facebook", type: "facebook" },
   { value: "TikTok", label: "TikTok", type: "tiktok" },
@@ -70,7 +70,7 @@ const specs = {
       text: "Text der News",
       publishAt: "2026-12-01-00:00",
       deleteAt: "2027-01-31-23:59",
-      links: [{ type: "more", label: "Mehr", url: "https://example.org" }]
+      links: [{ type: "more", label: "Mehr erfahren", url: "https://example.org" }]
     }
   },
   events: {
