@@ -183,6 +183,22 @@ const specs = {
       url: "https://example.org"
     }
   },
+  "header-notices": {
+    filename: "header-notices.json",
+    summaryKeys: ["text", "countdown"],
+    fields: [
+      { name: "text", type: "textarea", required: true },
+      { name: "countdown", type: "datetime", placeholder: "JJJJ-MM-TT-HH:mm" },
+      { name: "publishAt", type: "datetime", placeholder: "JJJJ-MM-TT-HH:mm" },
+      { name: "deleteAt", type: "datetime", required: true, placeholder: "JJJJ-MM-TT-HH:mm" }
+    ],
+    template: {
+      text: "Hinweistext",
+      countdown: "2026-05-09-16:30",
+      publishAt: "2026-04-18-15:00",
+      deleteAt: "2026-05-09-16:30"
+    }
+  },
   gallery: {
     filename: "gallerys/{xyz}.json",
     summaryKeys: ["src", "alt"],
