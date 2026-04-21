@@ -446,6 +446,28 @@ function rememberGalleryFiles(files) {
   });
 }
 
+function getCurrentGallerySrcPathsFromInputs() {
+  if (typeSelect.value !== "gallery") return new Set();
+  const paths = new Set();
+  entriesEl.querySelectorAll('.entry [data-field="src"]').forEach((input) => {
+    const filename = getFilenameOnly(input.value);
+    const prefix = input.dataset.pathPrefix || "";
+    if (!filename || !prefix) return;
+    paths.add(`${prefix}${filename}`.replace(/^\.\//, ""));
+  });
+  return paths;
+}
+
+function pruneUnusedSelectedGalleryFiles() {
+  if (typeSelect.value !== "gallery") return;
+  const activePaths = getCurrentGallerySrcPathsFromInputs();
+  [...selectedGalleryFiles.entries()].forEach(([filePath, fileData]) => {
+    if (activePaths.has(filePath)) return;
+    if (fileData?.objectUrl) URL.revokeObjectURL(fileData.objectUrl);
+    selectedGalleryFiles.delete(filePath);
+  });
+}
+
 function resetValidationUi() {
   validationList.innerHTML = "";
   entriesEl.querySelectorAll(".has-error").forEach((el) => el.classList.remove("has-error"));
@@ -1105,6 +1127,7 @@ function addEntry(defaults = {}, { expand = true, insert = "auto", scrollToEntry
   deleteBtn.textContent = "Eintrag löschen";
   deleteBtn.addEventListener("click", () => {
     entry.remove();
+    pruneUnusedSelectedGalleryFiles();
     renumberAndRefreshSummaries();
     resetValidationUi();
   });
@@ -1147,6 +1170,7 @@ function addEntry(defaults = {}, { expand = true, insert = "auto", scrollToEntry
 
 function validateAndGenerate() {
   resetValidationUi();
+  pruneUnusedSelectedGalleryFiles();
 
   const entries = [...entriesEl.querySelectorAll(".entry")].map((entryEl) => {
     updateNewsDeleteAt(entryEl);
@@ -1461,6 +1485,7 @@ function openCommitDialog(defaultMessage) {
 }
 
 async function commitGeneratedJson() {
+  pruneUnusedSelectedGalleryFiles();
   const parsedJson = getOutputJson();
   if (!parsedJson) {
     setCommitStatus("Bitte zuerst erfolgreich validieren, damit ein gültiges JSON vorhanden ist.", "error");
