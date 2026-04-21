@@ -27,12 +27,12 @@ Dieses Dokument beschreibt **alle JSON-Dateien** im Projekt, inklusive:
 Es gibt im Projekt zwei unterschiedliche Datumsformate:
 
 1. **Anzeigeformat** (`date`):
-   - `TT.MM.JJJJ`
-   - Beispiel: `11.04.2026`
+    - `TT.MM.JJJJ`
+    - Beispiel: `11.04.2026`
 
 2. **Sichtbarkeitsfenster** (`publishAt`, `deleteAt`):
-   - `JJJJ-MM-TT-HH:mm`
-   - Beispiel: `2026-11-11-12:00`
+    - `JJJJ-MM-TT-HH:mm`
+    - Beispiel: `2026-11-11-12:00`
 
 ### 1.3 Sichtbarkeitslogik (`publishAt` / `deleteAt`)
 
@@ -406,12 +406,12 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ### 9.2 Felder pro Eintrag
 
-| Feld        | Typ      | Pflicht                                                                 | Beschreibung                                                              |
-|-------------|----------|-------------------------------------------------------------------------|---------------------------------------------------------------------------|
-| `text`      | `string` | Ja                                                                      | Hinweistext, der im Band angezeigt wird.                                  |
+| Feld        | Typ      | Pflicht                                                                 | Beschreibung                                                               |
+|-------------|----------|-------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| `text`      | `string` | Ja                                                                      | Hinweistext, der im Band angezeigt wird.                                   |
 | `countdown` | `string` | Optional                                                                | Zielzeitpunkt (`JJJJ-MM-TT-HH:mm`) für einen Live-Countdown hinter `text`. |
-| `publishAt` | `string` | Optional                                                                | Start Sichtbarkeit (`JJJJ-MM-TT-HH:mm`).                                  |
-| `deleteAt`  | `string` | Wenn `countdown`, dann das Datum vom Countdown, sonst trotzdem Pflicht. | Ende Sichtbarkeit (`JJJJ-MM-TT-HH:mm`).                           |
+| `publishAt` | `string` | Optional                                                                | Start Sichtbarkeit (`JJJJ-MM-TT-HH:mm`).                                   |
+| `deleteAt`  | `string` | Wenn `countdown`, dann das Datum vom Countdown, sonst trotzdem Pflicht. | Ende Sichtbarkeit (`JJJJ-MM-TT-HH:mm`).                                    |
 
 ### 9.3 Countdown-Regeln
 
@@ -436,7 +436,39 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ---
 
-## 10) Checkliste vor dem Speichern
+# 10) Datei: `downloads.json`
+
+Pfad: `./src/data/downloads.json`
+
+## 10.1 Zweck
+
+Alle Dateidownloads, die auf der Downloadseite angezeigt werden.
+
+## 10.2 Felder pro Eintrag
+
+| Feld          | Typ      | Pflicht   | Beschreibung                             |
+|---------------|----------|-----------|------------------------------------------|
+| `title`       | `string` | Ja        | Name des Downloads                       |
+| `description` | `string` | Empfohlen | Beschreibt den Inhalt des Dokuments      |
+| `file`        | `string` | Ja        | Dateipfad. `./src/downloads/{dateiname}` |
+| `label`       | `string` | Ja        | Buttontext                               |
+
+##10.3 Vorlage
+
+```json
+[
+  {
+    "title": "Anmeldung Umzug Sandersdorf",
+    "description": "Anmeldeformular für den Umzug in Sandersdorf.",
+    "file": "./src/downloads/AnmeldungUmzugSandersdorf.pdf",
+    "label": "PDF herunterladen"
+  }
+]
+```
+
+---
+
+## 11) Checkliste vor dem Speichern
 
 1. JSON ist syntaktisch valide.
 2. Top-Level ist ein Array.
@@ -448,26 +480,26 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ---
 
-## 11) Minimale Komplettbeispiele (alle Dateien)
+## 12) Minimale Komplettbeispiele (alle Dateien)
 
 ### `news.json`
 
 ```json
 [
-   {
-      "title": "Beispielnews",
-      "date": "01.01.2027",
-      "text": "Text der News",
-      "publishAt": "2026-12-01-00:00",
-      "deleteAt": "2027-01-31-23:59",
-      "links": [
-         {
-            "type": "more",
-            "label": "Mehr",
-            "url": "https://example.org"
-         }
-      ]
-   }
+  {
+    "title": "Beispielnews",
+    "date": "01.01.2027",
+    "text": "Text der News",
+    "publishAt": "2026-12-01-00:00",
+    "deleteAt": "2027-01-31-23:59",
+    "links": [
+      {
+        "type": "more",
+        "label": "Mehr",
+        "url": "https://example.org"
+      }
+    ]
+  }
 ]
 ```
 
@@ -475,14 +507,14 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ```json
 [
-   {
-      "title": "Beispielveranstaltung",
-      "date": "11.11.2026",
-      "time": "11:11 Uhr",
-      "location": "Rathaus",
-      "publishAt": "2026-10-01-00:00",
-      "deleteAt": "2026-11-12-00:00"
-   }
+  {
+    "title": "Beispielveranstaltung",
+    "date": "11.11.2026",
+    "time": "11:11 Uhr",
+    "location": "Rathaus",
+    "publishAt": "2026-10-01-00:00",
+    "deleteAt": "2026-11-12-00:00"
+  }
 ]
 ```
 
@@ -490,23 +522,23 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ```json
 [
-   {
-      "name": "Max Mustermann",
-      "role": "Präsident",
-      "image": "src/img/verein/vorstand/max-mustermann.png",
-      "tags": [
-         "Leitung"
-      ],
-      "description": "Kurztext",
-      "socials": [
-         {
-            "label": "E-Mail",
-            "href": "mailto:max@example.org",
-            "className": "liEmail",
-            "icon": "@"
-         }
-      ]
-   }
+  {
+    "name": "Max Mustermann",
+    "role": "Präsident",
+    "image": "src/img/verein/vorstand/max-mustermann.png",
+    "tags": [
+      "Leitung"
+    ],
+    "description": "Kurztext",
+    "socials": [
+      {
+        "label": "E-Mail",
+        "href": "mailto:max@example.org",
+        "className": "liEmail",
+        "icon": "@"
+      }
+    ]
+  }
 ]
 ```
 
@@ -514,11 +546,11 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ```json
 [
-   {
-      "name": "Erika Muster",
-      "role": "Programm",
-      "image": "./src/img/verein/elferrat/erika-muster.svg"
-   }
+  {
+    "name": "Erika Muster",
+    "role": "Programm",
+    "image": "./src/img/verein/elferrat/erika-muster.svg"
+  }
 ]
 ```
 
@@ -526,17 +558,17 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ```json
 [
-   {
-      "session": "48. Session",
-      "year": "2026/2027",
-      "image": "./src/img/verein/prinzenpaare/pp2627.JPG",
-      "adultPair": [
-         {
-            "prince": "Max I.",
-            "princess": "Mia I."
-         }
-      ]
-   }
+  {
+    "session": "48. Session",
+    "year": "2026/2027",
+    "image": "./src/img/verein/prinzenpaare/pp2627.JPG",
+    "adultPair": [
+      {
+        "prince": "Max I.",
+        "princess": "Mia I."
+      }
+    ]
+  }
 ]
 ```
 
@@ -544,11 +576,11 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ```json
 [
-   {
-      "icon": "website",
-      "text": "Webseite",
-      "url": "https://example.org"
-   }
+  {
+    "icon": "website",
+    "text": "Webseite",
+    "url": "https://example.org"
+  }
 ]
 ```
 
@@ -556,10 +588,10 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ```json
 [
-   {
-      "src": "./src/img/home-gallery/01.JPG",
-      "alt": "Titelbild"
-   }
+  {
+    "src": "./src/img/home-gallery/01.JPG",
+    "alt": "Titelbild"
+  }
 ]
 ```
 
@@ -567,10 +599,10 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ```json
 [
-   {
-      "src": "./src/img/sponsors/sponsor.png",
-      "alt": "Sponsorname"
-   }
+  {
+    "src": "./src/img/sponsors/sponsor.png",
+    "alt": "Sponsorname"
+  }
 ]
 ```
 
@@ -578,11 +610,24 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ```json
 [
-   {
-      "text": "Vorverkauf endet in:",
-      "countdown": "2026-04-19-15:18",
-      "publishAt": "2026-01-01-00:00",
-      "deleteAt": "2026-04-19-15:18"
-   }
+  {
+    "text": "Vorverkauf endet in:",
+    "countdown": "2026-04-19-15:18",
+    "publishAt": "2026-01-01-00:00",
+    "deleteAt": "2026-04-19-15:18"
+  }
+]
+```
+
+### `downloads-json`
+
+```json
+[
+  {
+    "title": "Anmeldung Umzug Sandersdorf",
+    "description": "Anmeldeformular für den Umzug in Sandersdorf.",
+    "file": "./src/downloads/AnmeldungUmzugSandersdorf.pdf",
+    "label": "PDF herunterladen"
+  }
 ]
 ```
