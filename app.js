@@ -183,6 +183,22 @@ const specs = {
       url: "https://example.org"
     }
   },
+  downloads: {
+    filename: "downloads.json",
+    summaryKeys: ["title", "file"],
+    fields: [
+      { name: "title", type: "text", required: true },
+      { name: "description", type: "textarea" },
+      { name: "file", type: "text", required: true, filenameOnly: true, pathPrefix: "./src/downloads/" },
+      { name: "label", type: "text", required: true }
+    ],
+    template: {
+      title: "Anmeldung Umzug Sandersdorf",
+      description: "Anmeldeformular für den Umzug in Sandersdorf.",
+      file: "./src/downloads/AnmeldungUmzugSandersdorf.pdf",
+      label: "PDF herunterladen"
+    }
+  },
   "header-notices": {
     filename: "header-notices.json",
     summaryKeys: ["text", "countdown"],
