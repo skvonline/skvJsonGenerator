@@ -258,6 +258,7 @@ const DEFAULT_GALLERY_NAME = "home-gallery";
 let confirmedGalleryName = "";
 let galleryNameConfirmed = false;
 const selectedGalleryFiles = new Map();
+let onlineJsonLoaded = false;
 
 function appendOption(key) {
   const opt = document.createElement("option");
@@ -375,7 +376,7 @@ function updateGalleryConfirmationState() {
   const needsConfirmation = isGalleryType && (!galleryNameConfirmed || currentName !== confirmedGalleryName);
 
   loadOnlineBtn.disabled = needsConfirmation;
-  addEntryBtn.disabled = needsConfirmation;
+  addEntryBtn.disabled = needsConfirmation || !onlineJsonLoaded;
 
   if (!isGalleryType) {
     setGalleryHint("Bitte Ordnernamen bestätigen, bevor Einträge geladen oder erstellt werden.");
@@ -421,6 +422,11 @@ function clearResult() {
   outputEl.textContent = "";
   resultActions.classList.add("hidden");
   setCommitStatus("");
+}
+
+function setOnlineJsonLoaded(value) {
+  onlineJsonLoaded = Boolean(value);
+  updateGalleryConfirmationState();
 }
 
 function rememberGalleryFiles(files) {
@@ -1249,50 +1255,98 @@ function fileToBase64(file) {
   });
 }
 
-async function upsertGithubFile({ owner, repo, branch, token, path, message, contentBase64 }) {
-  const sha = await getExistingFileSha({ owner, repo, path, branch, token });
-  const payload = {
-    message,
-    content: contentBase64,
-    branch
-  };
-  if (sha) payload.sha = sha;
-
-  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-    method: "PUT",
+async function githubApiRequest(url, { token, method = "GET", body } = {}) {
+  const response = await fetch(url, {
+    method,
     headers: {
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
+      ...(body ? { "Content-Type": "application/json" } : {})
     },
-    body: JSON.stringify(payload)
+    ...(body ? { body: JSON.stringify(body) } : {})
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`GitHub API Fehler (${response.status}) bei '${path}': ${errorText}`);
+    throw new Error(`GitHub API Fehler (${response.status}): ${errorText}`);
   }
 
   return response.json();
 }
 
-async function getExistingFileSha({ owner, repo, path, branch, token }) {
-  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}`;
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`
+async function createGitBlob({ owner, repo, token, contentBase64 }) {
+  const url = `https://api.github.com/repos/${owner}/${repo}/git/blobs`;
+  const payload = await githubApiRequest(url, {
+    token,
+    method: "POST",
+    body: {
+      content: contentBase64,
+      encoding: "base64"
+    },
+  });
+  return payload.sha;
+}
+
+async function getCommitTreeSha({ owner, repo, token, commitSha }) {
+  const payload = await githubApiRequest(`https://api.github.com/repos/${owner}/${repo}/git/commits/${commitSha}`, { token });
+  return payload?.tree?.sha || null;
+}
+
+async function createGitTree({ owner, repo, token, baseTreeSha, entries }) {
+  const payload = await githubApiRequest(`https://api.github.com/repos/${owner}/${repo}/git/trees`, {
+    token,
+    method: "POST",
+    body: {
+      base_tree: baseTreeSha,
+      tree: entries
     }
   });
+  return payload.sha;
+}
 
-  if (response.status === 404) return null;
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Datei-Info konnte nicht geladen werden (${response.status}): ${errorText}`);
+async function createGitCommit({ owner, repo, token, message, treeSha, parentSha }) {
+  const payload = await githubApiRequest(`https://api.github.com/repos/${owner}/${repo}/git/commits`, {
+    token,
+    method: "POST",
+    body: {
+      message,
+      tree: treeSha,
+      parents: [parentSha]
+    }
+  });
+  return payload.sha;
+}
+
+async function updateBranchRef({ owner, repo, token, branch, commitSha }) {
+  await githubApiRequest(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`, {
+    token,
+    method: "PATCH",
+    body: { sha: commitSha, force: false }
+  });
+}
+
+async function createSingleGitHubCommit({ owner, repo, branch, token, message, files }) {
+  const headSha = await getBranchHeadSha({ owner, repo, branch, token });
+  if (!headSha) throw new Error(`Branch '${branch}' konnte nicht aufgelöst werden.`);
+
+  const baseTreeSha = await getCommitTreeSha({ owner, repo, token, commitSha: headSha });
+  if (!baseTreeSha) throw new Error("Basis-Tree konnte nicht geladen werden.");
+
+  const treeEntries = [];
+  for (const file of files) {
+    const blobSha = await createGitBlob({ owner, repo, token, contentBase64: file.contentBase64 });
+    treeEntries.push({
+      path: file.path,
+      mode: "100644",
+      type: "blob",
+      sha: blobSha
+    });
   }
 
-  const payload = await response.json();
-  return payload.sha || null;
+  const treeSha = await createGitTree({ owner, repo, token, baseTreeSha, entries: treeEntries });
+  const commitSha = await createGitCommit({ owner, repo, token, message, treeSha, parentSha: headSha });
+  await updateBranchRef({ owner, repo, token, branch, commitSha });
+  return commitSha;
 }
 
 async function getRepositoryDefaultBranch({ owner, repo, token }) {
@@ -1432,15 +1486,9 @@ async function commitGeneratedJson() {
     await ensureBranchExists({ owner, repo, branch, token: commitInput.token });
     setCommitStatus("Commit wird erstellt...");
     const normalizedJson = JSON.stringify(parsedJson, null, 2);
-    const result = await upsertGithubFile({
-      owner,
-      repo,
-      branch,
-      token: commitInput.token,
-      path,
-      message: commitInput.commitMessage,
-      contentBase64: toBase64Utf8(`${normalizedJson}\n`)
-    });
+    const filesForCommit = [
+      { path, contentBase64: toBase64Utf8(`${normalizedJson}\n`) }
+    ];
 
     if (typeSelect.value === "gallery") {
       const galleryFilePaths = new Set(
@@ -1456,19 +1504,20 @@ async function commitGeneratedJson() {
 
       for (const item of filesToUpload) {
         const contentBase64 = await fileToBase64(item.file);
-        await upsertGithubFile({
-          owner,
-          repo,
-          branch,
-          token: commitInput.token,
-          path: item.filePath,
-          message: commitInput.commitMessage,
-          contentBase64
-        });
+        filesForCommit.push({ path: item.filePath, contentBase64 });
       }
     }
 
-    const commitUrl = result?.commit?.html_url || "";
+    const commitSha = await createSingleGitHubCommit({
+      owner,
+      repo,
+      branch,
+      token: commitInput.token,
+      message: commitInput.commitMessage,
+      files: filesForCommit
+    });
+
+    const commitUrl = commitSha ? `https://github.com/${owner}/${repo}/commit/${commitSha}` : "";
     const statusText = commitUrl
       ? `Commit erfolgreich: <a href="https://github.com/richti03/skvstatic/compare/SkvJsonGenerator" target="_blank">${commitUrl}</a>`
       : "Commit erfolgreich erstellt.";
@@ -1505,8 +1554,10 @@ async function loadOnlineJson() {
     });
 
     renderEntries(typeSelect.value, normalizedJson);
+    setOnlineJsonLoaded(true);
     loadOnlineBtn.textContent = "Online JSON geladen";
   } catch (error) {
+    setOnlineJsonLoaded(false);
     loadOnlineBtn.textContent = `Fehler beim Laden (${error.message})`;
   } finally {
     setTimeout(() => {
@@ -1517,6 +1568,7 @@ async function loadOnlineJson() {
 }
 
 typeSelect.addEventListener("change", () => {
+  setOnlineJsonLoaded(false);
   if (typeSelect.value === "gallery" && !galleryNameConfirmed) {
     galleryNameInput.value = DEFAULT_GALLERY_NAME;
   }
