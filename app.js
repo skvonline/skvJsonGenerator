@@ -276,11 +276,15 @@ const confirmGalleryInternalImageBtn = document.querySelector("#confirmGalleryIn
 const cancelGalleryInternalImageBtn = document.querySelector("#cancelGalleryInternalImageBtn");
 const scrollTopBtn = document.querySelector("#scrollTopBtn");
 const DEFAULT_GALLERY_NAME = "home-gallery";
+const MANAGED_FILE_TYPES = new Set(["vorstand", "elferrat", "royals", "downloads"]);
 let confirmedGalleryName = "";
 let galleryNameConfirmed = false;
 const selectedGalleryFiles = new Map();
 const pendingGalleryRepoDeletes = new Set();
 const detachedGalleryUploads = new Set();
+const selectedManagedFiles = new Map();
+const pendingManagedRepoDeletes = new Set();
+const detachedManagedUploads = new Set();
 let onlineJsonLoaded = false;
 
 function appendOption(key) {
@@ -471,6 +475,95 @@ function rememberGalleryFiles(files) {
   });
 }
 
+function isManagedFileType(typeKey = typeSelect.value) {
+  return MANAGED_FILE_TYPES.has(typeKey);
+}
+
+function getManagedFilenameField(typeKey = typeSelect.value) {
+  const fields = specs[typeKey]?.fields;
+  if (!Array.isArray(fields)) return null;
+  return fields.find((field) => field.filenameOnly) || null;
+}
+
+function getManagedFileInput(entryEl) {
+  const fileField = getManagedFilenameField();
+  if (!fileField || !entryEl) return null;
+  return entryEl.querySelector(`[data-field="${fileField.name}"]`);
+}
+
+function getManagedRepoPathFromInput(input) {
+  if (!input || input.dataset.filenameOnly !== "true") return "";
+  const filename = getFilenameOnly(input.value);
+  const prefix = input.dataset.pathPrefix || "";
+  if (!filename || !prefix) return "";
+  return `${prefix}${filename}`.replace(/^\.\//, "");
+}
+
+function getManagedRepoPathFromEntry(entryEl) {
+  return getManagedRepoPathFromInput(getManagedFileInput(entryEl));
+}
+
+function rememberManagedFiles(files) {
+  if (!isManagedFileType() || !Array.isArray(files) || files.length === 0) return;
+  const field = getManagedFilenameField();
+  if (!field?.pathPrefix) return;
+
+  files.forEach((file) => {
+    const safeFilename = getFilenameOnly(file?.name || "");
+    if (!safeFilename) return;
+    const repoPath = `${field.pathPrefix}${safeFilename}`.replace(/^\.\//, "");
+    const existing = selectedManagedFiles.get(repoPath);
+    if (existing?.objectUrl) URL.revokeObjectURL(existing.objectUrl);
+    selectedManagedFiles.set(repoPath, { file, objectUrl: URL.createObjectURL(file) });
+  });
+}
+
+function getCurrentManagedPathsFromInputs() {
+  if (!isManagedFileType()) return new Set();
+  const paths = new Set();
+  entriesEl.querySelectorAll('.entry input[data-filename-only="true"]').forEach((input) => {
+    const path = getManagedRepoPathFromInput(input);
+    if (path) paths.add(path);
+  });
+  return paths;
+}
+
+function pruneUnusedSelectedManagedFiles() {
+  if (!isManagedFileType()) return;
+  const activePaths = getCurrentManagedPathsFromInputs();
+  [...selectedManagedFiles.entries()].forEach(([filePath, fileData]) => {
+    if (activePaths.has(filePath) || detachedManagedUploads.has(filePath)) return;
+    if (fileData?.objectUrl) URL.revokeObjectURL(fileData.objectUrl);
+    selectedManagedFiles.delete(filePath);
+  });
+}
+
+function prunePendingManagedDeletes(activeEntries = null) {
+  if (!isManagedFileType()) return;
+  const fileField = getManagedFilenameField();
+  const activePaths = activeEntries
+    ? new Set(
+      activeEntries
+        .map((entry) => (entry?.[fileField.name] && typeof entry[fileField.name] === "string" ? entry[fileField.name] : ""))
+        .filter(Boolean)
+        .map((src) => src.replace(/^\.\//, ""))
+    )
+    : getCurrentManagedPathsFromInputs();
+
+  [...pendingManagedRepoDeletes].forEach((filePath) => {
+    if (activePaths.has(filePath)) pendingManagedRepoDeletes.delete(filePath);
+  });
+}
+
+function clearManagedTrackingState() {
+  [...selectedManagedFiles.values()].forEach((item) => {
+    if (item?.objectUrl) URL.revokeObjectURL(item.objectUrl);
+  });
+  selectedManagedFiles.clear();
+  pendingManagedRepoDeletes.clear();
+  detachedManagedUploads.clear();
+}
+
 function getCurrentGallerySrcPathsFromInputs() {
   if (typeSelect.value !== "gallery") return new Set();
   const paths = new Set();
@@ -522,12 +615,17 @@ function prunePendingGalleryDeletes(activeEntries = null) {
 
 function removeEntryElement(entryEl) {
   const removedSrcPath = getGalleryEntrySrcPath(entryEl);
+  const removedManagedPath = getManagedRepoPathFromEntry(entryEl);
   entryEl.remove();
   pruneUnusedSelectedGalleryFiles();
+  pruneUnusedSelectedManagedFiles();
   renumberAndRefreshSummaries();
   resetValidationUi();
   if (removedSrcPath && pendingGalleryRepoDeletes.has(removedSrcPath)) {
     prunePendingGalleryDeletes();
+  }
+  if (removedManagedPath && pendingManagedRepoDeletes.has(removedManagedPath)) {
+    prunePendingManagedDeletes();
   }
 }
 
@@ -631,8 +729,16 @@ function updateImagePreviewForInput(input) {
   const isGalleryImage = typeSelect.value === "gallery" && input.dataset.field === "src";
   const galleryRepoPath = relativeSrc.replace(/^\.\//, "");
   const selectedGalleryFile = isGalleryImage ? selectedGalleryFiles.get(galleryRepoPath) : null;
+  const selectedManagedFile = !isGalleryImage ? selectedManagedFiles.get(galleryRepoPath) : null;
   if (selectedGalleryFile?.objectUrl) {
     previewEl.src = selectedGalleryFile.objectUrl;
+    previewEl.alt = `Vorschau ${filename}`;
+    previewEl.classList.remove("hidden");
+    delete previewEl.dataset.fallbackSrc;
+    return;
+  }
+  if (selectedManagedFile?.objectUrl) {
+    previewEl.src = selectedManagedFile.objectUrl;
     previewEl.alt = `Vorschau ${filename}`;
     previewEl.classList.remove("hidden");
     delete previewEl.dataset.fallbackSrc;
@@ -663,6 +769,46 @@ function setGallerySrcInputMode(srcInput, mode, value) {
 
   inputWithPrefix?.classList.toggle("is-external-source", mode === "external");
   updateImagePreviewForInput(srcInput);
+}
+
+async function startManagedFileReplacement(entryEl) {
+  if (!isManagedFileType()) return;
+  const fileInput = getManagedFileInput(entryEl);
+  if (!fileInput) return;
+
+  const previousPath = getManagedRepoPathFromInput(fileInput);
+  let selectedPolicy = null;
+  if (previousPath) {
+    selectedPolicy = await openGalleryReplacePolicyDialog();
+    if (!selectedPolicy) return;
+  }
+
+  const picker = document.createElement("input");
+  picker.type = "file";
+  picker.accept = typeSelect.value === "downloads" ? ".pdf,.doc,.docx,.zip,.jpg,.jpeg,.png,.svg" : "image/*";
+  picker.addEventListener("change", () => {
+    const [file] = [...(picker.files || [])];
+    if (!file) return;
+
+    if (previousPath && selectedPolicy === "delete") {
+      pendingManagedRepoDeletes.add(previousPath);
+      detachedManagedUploads.delete(previousPath);
+    } else if (previousPath && selectedPolicy === "keep") {
+      pendingManagedRepoDeletes.delete(previousPath);
+      if (selectedManagedFiles.has(previousPath)) detachedManagedUploads.add(previousPath);
+    }
+
+    rememberManagedFiles([file]);
+    const nextPath = `${fileInput.dataset.pathPrefix || ""}${getFilenameOnly(file.name)}`.replace(/^\.\//, "");
+    pendingManagedRepoDeletes.delete(nextPath);
+    detachedManagedUploads.delete(nextPath);
+    fileInput.value = getFilenameOnly(file.name);
+    updateImagePreviewForInput(fileInput);
+    const index = [...entriesEl.querySelectorAll(".entry")].indexOf(entryEl);
+    refreshEntrySummary(entryEl, index);
+    resetValidationUi();
+  }, { once: true });
+  picker.click();
 }
 
 function createInput(field, value) {
@@ -1547,12 +1693,13 @@ function addEntry(defaults = {}, { expand = true, insert = "auto", scrollToEntry
   deleteBtn.type = "button";
   deleteBtn.textContent = "Eintrag löschen";
   deleteBtn.addEventListener("click", async () => {
-    if (typeSelect.value !== "gallery") {
+    if (typeSelect.value !== "gallery" && !isManagedFileType()) {
       removeEntryElement(entry);
       return;
     }
 
     const srcPath = getGalleryEntrySrcPath(entry);
+    const managedPath = getManagedRepoPathFromEntry(entry);
     const decision = await openGalleryDeleteDialog();
     if (!decision) return;
 
@@ -1560,10 +1707,18 @@ function addEntry(defaults = {}, { expand = true, insert = "auto", scrollToEntry
       pendingGalleryRepoDeletes.add(srcPath);
       detachedGalleryUploads.delete(srcPath);
     }
+    if (decision === "delete-repo" && managedPath) {
+      pendingManagedRepoDeletes.add(managedPath);
+      detachedManagedUploads.delete(managedPath);
+    }
 
     if (decision === "entry-only" && srcPath) {
       pendingGalleryRepoDeletes.delete(srcPath);
       if (selectedGalleryFiles.has(srcPath)) detachedGalleryUploads.add(srcPath);
+    }
+    if (decision === "entry-only" && managedPath) {
+      pendingManagedRepoDeletes.delete(managedPath);
+      if (selectedManagedFiles.has(managedPath)) detachedManagedUploads.add(managedPath);
     }
 
     removeEntryElement(entry);
@@ -1605,6 +1760,23 @@ function addEntry(defaults = {}, { expand = true, insert = "auto", scrollToEntry
         }
         else wrapper.append(changeBtn);
       }
+      if (isManagedFileType(typeKey) && field.filenameOnly) {
+        input.readOnly = true;
+        const changeBtn = document.createElement("button");
+        changeBtn.type = "button";
+        changeBtn.textContent = "🔁";
+        changeBtn.className = "input-suffix-action";
+        changeBtn.title = "Datei wechseln";
+        changeBtn.setAttribute("aria-label", "Datei wechseln");
+        changeBtn.addEventListener("click", () => startManagedFileReplacement(entry));
+        const prefixWrap = input.closest(".input-with-prefix");
+        if (prefixWrap) {
+          prefixWrap.classList.add("has-suffix-action");
+          prefixWrap.append(changeBtn);
+        } else {
+          wrapper.append(changeBtn);
+        }
+      }
       body.append(wrapper);
     }
   });
@@ -1628,7 +1800,9 @@ function addEntry(defaults = {}, { expand = true, insert = "auto", scrollToEntry
 function validateAndGenerate() {
   resetValidationUi();
   pruneUnusedSelectedGalleryFiles();
+  pruneUnusedSelectedManagedFiles();
   prunePendingGalleryDeletes();
+  prunePendingManagedDeletes();
 
   const entries = [...entriesEl.querySelectorAll(".entry")].map((entryEl) => {
     updateNewsDeleteAt(entryEl);
@@ -1661,6 +1835,7 @@ function renderEntries(typeKey, dataList = null, { useTemplate = false } = {}) {
     pendingGalleryRepoDeletes.clear();
     detachedGalleryUploads.clear();
   }
+  clearManagedTrackingState();
 
   const defaults = Array.isArray(dataList) && dataList.length > 0
     ? dataList
@@ -1981,6 +2156,7 @@ function openCommitDialog(defaultMessage) {
 
 async function commitGeneratedJson() {
   pruneUnusedSelectedGalleryFiles();
+  pruneUnusedSelectedManagedFiles();
   const parsedJson = getOutputJson();
   if (!parsedJson) {
     setCommitStatus("Bitte zuerst erfolgreich validieren, damit ein gültiges JSON vorhanden ist.", "error");
@@ -1992,6 +2168,7 @@ async function commitGeneratedJson() {
   const branch = CONFIG.GITHUB_BRANCH;
   const path = getDataPath();
   prunePendingGalleryDeletes(parsedJson);
+  prunePendingManagedDeletes(parsedJson);
 
   const defaultMessage = `Update ${path} via SKV JSON Generator`;
   const commitInput = await openCommitDialog(defaultMessage);
@@ -2037,6 +2214,33 @@ async function commitGeneratedJson() {
       });
     }
 
+    if (isManagedFileType()) {
+      const fileField = getManagedFilenameField();
+      const managedFilePaths = new Set(
+        parsedJson
+          .map((entry) => (entry?.[fileField.name] && typeof entry[fileField.name] === "string" ? entry[fileField.name] : ""))
+          .filter(Boolean)
+          .map((src) => src.replace(/^\.\//, ""))
+      );
+
+      const filesToUpload = [...selectedManagedFiles.entries()]
+        .filter(([filePath]) => {
+          if (pendingManagedRepoDeletes.has(filePath)) return false;
+          return managedFilePaths.has(filePath) || detachedManagedUploads.has(filePath);
+        })
+        .map(([filePath, data]) => ({ filePath, file: data.file }));
+
+      for (const item of filesToUpload) {
+        const contentBase64 = await fileToBase64(item.file);
+        filesForCommit.push({ path: item.filePath, contentBase64 });
+      }
+
+      pendingManagedRepoDeletes.forEach((filePath) => {
+        if (managedFilePaths.has(filePath)) return;
+        filesForCommit.push({ path: filePath, delete: true });
+      });
+    }
+
     const commitSha = await createSingleGitHubCommit({
       owner,
       repo,
@@ -2052,6 +2256,8 @@ async function commitGeneratedJson() {
       : "Commit erfolgreich erstellt.";
     if (typeSelect.value === "gallery") pendingGalleryRepoDeletes.clear();
     if (typeSelect.value === "gallery") detachedGalleryUploads.clear();
+    if (isManagedFileType()) pendingManagedRepoDeletes.clear();
+    if (isManagedFileType()) detachedManagedUploads.clear();
     setCommitStatus(statusText, "success");
   } catch (error) {
     setCommitStatus(`Commit fehlgeschlagen: ${error.message}`, "error");
