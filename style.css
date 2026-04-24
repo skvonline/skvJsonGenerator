@@ -63,13 +63,6 @@ h1, h2 { margin-top: 0; }
   gap: 0.5rem;
 }
 
-.branch-custom-label {
-  display: block;
-  margin-top: 0.35rem;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
 .icon-button {
   width: 2.5rem;
   height: 2.5rem;
