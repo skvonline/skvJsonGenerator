@@ -272,6 +272,7 @@ const cancelGallerySourceBtn = document.querySelector("#cancelGallerySourceBtn")
 const galleryInternalPickerDialog = document.querySelector("#galleryInternalPickerDialog");
 const galleryInternalPickerForm = document.querySelector("#galleryInternalPickerForm");
 const galleryInternalImageSelect = document.querySelector("#galleryInternalImageSelect");
+const galleryInternalImagePreview = document.querySelector("#galleryInternalImagePreview");
 const confirmGalleryInternalImageBtn = document.querySelector("#confirmGalleryInternalImageBtn");
 const cancelGalleryInternalImageBtn = document.querySelector("#cancelGalleryInternalImageBtn");
 const scrollTopBtn = document.querySelector("#scrollTopBtn");
@@ -949,20 +950,68 @@ function openInternalGalleryImageDialog(filenames) {
     option.textContent = filename;
     galleryInternalImageSelect.append(option);
   });
+  galleryInternalImageSelect.value = filenames[0];
+
+  const setInternalPreview = () => {
+    if (!galleryInternalImagePreview) return;
+    const selectedFile = galleryInternalImageSelect.value;
+    if (!selectedFile) {
+      galleryInternalImagePreview.classList.add("hidden");
+      galleryInternalImagePreview.removeAttribute("src");
+      delete galleryInternalImagePreview.dataset.fallbackSrc;
+      return;
+    }
+
+    const folder = getActiveGalleryName();
+    const repoPath = `src/img/gallerys/${folder}/${selectedFile}`;
+    const selectedGalleryFile = selectedGalleryFiles.get(repoPath);
+    if (selectedGalleryFile?.objectUrl) {
+      galleryInternalImagePreview.src = selectedGalleryFile.objectUrl;
+      galleryInternalImagePreview.alt = `Vorschau ${selectedFile}`;
+      galleryInternalImagePreview.classList.remove("hidden");
+      delete galleryInternalImagePreview.dataset.fallbackSrc;
+      return;
+    }
+
+    const relativeSrc = `./src/img/gallerys/${folder}/${selectedFile}`;
+    const absoluteSrc = `${CONFIG.DEFAULT_BASE_URL.replace(/\/$/, "")}/${relativeSrc.replace(/^\.\//, "")}`;
+    galleryInternalImagePreview.dataset.fallbackSrc = relativeSrc;
+    galleryInternalImagePreview.src = absoluteSrc;
+    galleryInternalImagePreview.alt = `Vorschau ${selectedFile}`;
+    galleryInternalImagePreview.classList.remove("hidden");
+  };
+
+  if (galleryInternalImagePreview) {
+    galleryInternalImagePreview.onerror = () => {
+      const fallbackSrc = galleryInternalImagePreview.dataset.fallbackSrc;
+      if (fallbackSrc && galleryInternalImagePreview.src !== fallbackSrc) {
+        galleryInternalImagePreview.src = fallbackSrc;
+        delete galleryInternalImagePreview.dataset.fallbackSrc;
+        return;
+      }
+      galleryInternalImagePreview.classList.add("hidden");
+      galleryInternalImagePreview.removeAttribute("src");
+      delete galleryInternalImagePreview.dataset.fallbackSrc;
+    };
+  }
+  setInternalPreview();
 
   return new Promise((resolve) => {
     const closeDialog = (result = null) => {
       confirmGalleryInternalImageBtn?.removeEventListener("click", handleConfirm);
       cancelGalleryInternalImageBtn?.removeEventListener("click", handleCancel);
+      galleryInternalImageSelect?.removeEventListener("change", handleChange);
       galleryInternalPickerDialog.removeEventListener("cancel", handleCancel);
       if (galleryInternalPickerDialog.open) galleryInternalPickerDialog.close();
       resolve(result);
     };
     const handleConfirm = () => closeDialog(galleryInternalImageSelect.value || null);
     const handleCancel = () => closeDialog(null);
+    const handleChange = () => setInternalPreview();
 
     confirmGalleryInternalImageBtn?.addEventListener("click", handleConfirm);
     cancelGalleryInternalImageBtn?.addEventListener("click", handleCancel);
+    galleryInternalImageSelect?.addEventListener("change", handleChange);
     galleryInternalPickerDialog.addEventListener("cancel", handleCancel);
     galleryInternalPickerDialog.showModal();
     galleryInternalImageSelect.focus();
@@ -1551,7 +1600,10 @@ function addEntry(defaults = {}, { expand = true, insert = "auto", scrollToEntry
         changeBtn.setAttribute("aria-label", "Bildquelle wechseln");
         changeBtn.addEventListener("click", () => startGalleryImageReplacement(entry));
         const prefixWrap = input.closest(".input-with-prefix");
-        if (prefixWrap) prefixWrap.append(changeBtn);
+        if (prefixWrap) {
+          prefixWrap.classList.add("has-suffix-action");
+          prefixWrap.append(changeBtn);
+        }
         else wrapper.append(changeBtn);
       }
       body.append(wrapper);

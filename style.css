@@ -115,6 +115,10 @@ select {
   overflow: hidden;
 }
 
+.input-with-prefix.has-suffix-action {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
 .input-prefix {
   padding: 0.45rem 0.55rem;
   background: #eff6ff;
@@ -130,6 +134,10 @@ select {
 }
 
 .input-with-prefix.is-external-source {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.input-with-prefix.is-external-source.has-suffix-action {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
