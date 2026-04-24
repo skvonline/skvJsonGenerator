@@ -129,6 +129,31 @@ select {
   border-radius: 0;
 }
 
+.input-with-prefix.is-external-source {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.input-with-prefix.is-external-source .input-prefix {
+  display: none;
+}
+
+.input-suffix-action {
+  border: 0;
+  border-left: 1px solid #8cb3ea;
+  border-radius: 0;
+  min-width: 2.6rem;
+  height: 100%;
+  align-self: stretch;
+  padding: 0 0.5rem;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-size: 1rem;
+}
+
+.input-suffix-action:hover {
+  background: #bfdbfe;
+}
+
 .image-preview {
   display: block;
   margin-top: 0.5rem;

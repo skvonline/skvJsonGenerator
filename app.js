@@ -650,6 +650,7 @@ function updateImagePreviewForInput(input) {
 
 function setGallerySrcInputMode(srcInput, mode, value) {
   if (!srcInput) return;
+  const inputWithPrefix = srcInput.closest(".input-with-prefix");
   srcInput.dataset.gallerySource = mode;
 
   if (mode === "external") {
@@ -660,6 +661,7 @@ function setGallerySrcInputMode(srcInput, mode, value) {
     srcInput.value = getFilenameOnly(value || "");
   }
 
+  inputWithPrefix?.classList.toggle("is-external-source", mode === "external");
   updateImagePreviewForInput(srcInput);
 }
 
@@ -887,17 +889,49 @@ async function fetchInternalGalleryImages() {
   const repo = CONFIG.GITHUB_REPO;
   const branch = CONFIG.GITHUB_BRANCH;
   const folder = getActiveGalleryName();
-  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/src/img/gallerys/${encodeURIComponent(folder)}?ref=${encodeURIComponent(branch)}`;
-  const response = await fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } });
-  if (!response.ok) throw new Error(`Ordner konnte nicht geladen werden (HTTP ${response.status}).`);
+  const folderPath = `src/img/gallerys/${folder}`;
+  const apiUrls = [
+    `https://api.github.com/repos/${owner}/${repo}/contents/${folderPath}?ref=${encodeURIComponent(branch)}`,
+    `https://api.github.com/repos/${owner}/${repo}/contents/${folderPath}`
+  ];
+  const imageNameSet = new Set();
 
-  const payload = await response.json();
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .filter((item) => item?.type === "file" && typeof item?.name === "string")
-    .map((item) => item.name)
-    .filter((name) => /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(name))
-    .sort((a, b) => a.localeCompare(b, "de"));
+  const knownFilenames = new Set();
+  entriesEl.querySelectorAll('.entry [data-field="src"]').forEach((input) => {
+    const filename = getGalleryImageFilenameFromValue(input.value);
+    if (filename) knownFilenames.add(filename);
+  });
+  [...selectedGalleryFiles.keys()]
+    .filter((filePath) => filePath.startsWith(`${folderPath}/`))
+    .forEach((filePath) => knownFilenames.add(filePath.split("/").pop()));
+
+  let lastError = null;
+  for (const apiUrl of apiUrls) {
+    try {
+      const response = await fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } });
+      if (!response.ok) {
+        lastError = new Error(`Ordner konnte nicht geladen werden (HTTP ${response.status}).`);
+        continue;
+      }
+
+      const payload = await response.json();
+      if (Array.isArray(payload)) {
+        payload
+          .filter((item) => item?.type === "file" && typeof item?.name === "string")
+          .map((item) => item.name)
+          .filter((name) => /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(name))
+          .forEach((name) => imageNameSet.add(name));
+      }
+      break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  knownFilenames.forEach((name) => imageNameSet.add(name));
+  const images = [...imageNameSet].sort((a, b) => a.localeCompare(b, "de"));
+  if (images.length > 0) return images;
+  throw lastError || new Error("Keine internen Bilder gefunden.");
 }
 
 function openInternalGalleryImageDialog(filenames) {
@@ -1511,10 +1545,14 @@ function addEntry(defaults = {}, { expand = true, insert = "auto", scrollToEntry
 
         const changeBtn = document.createElement("button");
         changeBtn.type = "button";
-        changeBtn.textContent = "Bild wechseln";
-        changeBtn.className = "secondary-button";
+        changeBtn.textContent = "🔁";
+        changeBtn.className = "input-suffix-action";
+        changeBtn.title = "Bildquelle wechseln";
+        changeBtn.setAttribute("aria-label", "Bildquelle wechseln");
         changeBtn.addEventListener("click", () => startGalleryImageReplacement(entry));
-        wrapper.append(changeBtn);
+        const prefixWrap = input.closest(".input-with-prefix");
+        if (prefixWrap) prefixWrap.append(changeBtn);
+        else wrapper.append(changeBtn);
       }
       body.append(wrapper);
     }
