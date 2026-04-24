@@ -990,13 +990,13 @@ async function handleEntryImageAction(entryEl) {
   const previousPath = getEntryImageRepoPathFromInput(imageInput);
 
   if (hasEntryImageValue(imageInput)) {
-    const decision = await openGalleryDeleteDialog();
+    const decision = await openGalleryReplacePolicyDialog();
     if (!decision) return;
-    if (decision === "delete-repo" && previousPath) {
+    if (decision === "delete" && previousPath) {
       pendingEntryImageRepoDeletes.add(previousPath);
       detachedEntryImageUploads.delete(previousPath);
     }
-    if (decision === "entry-only" && previousPath) {
+    if (decision === "keep" && previousPath) {
       pendingEntryImageRepoDeletes.delete(previousPath);
       if (selectedEntryImageFiles.has(previousPath)) detachedEntryImageUploads.add(previousPath);
     }
