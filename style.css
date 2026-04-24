@@ -8,6 +8,21 @@
 
 body { margin: 0; }
 
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(8px);
+  background: rgba(233, 242, 255, 0.92);
+  border-bottom: 1px solid #a8c7f5;
+}
+
+.app-header-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem;
+}
+
 .container {
   max-width: 980px;
   margin: 0 auto;
@@ -28,6 +43,59 @@ h1, h2 { margin-top: 0; }
 }
 
 .controls { display: grid; gap: 0.75rem; }
+
+.branch-toolbar {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 840px) {
+  .branch-toolbar {
+    grid-template-columns: 1fr 1fr auto;
+    align-items: end;
+  }
+}
+
+.branch-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icon-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  padding: 0;
+  font-size: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.github-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  border: 1px solid #1d4ed8;
+  color: #1d4ed8;
+  text-decoration: none;
+  background: #ffffff;
+  font-size: 1.2rem;
+}
+
+.github-icon-link:hover {
+  background: #eff6ff;
+}
+
+.github-icon-link svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
 
 .grid-2 {
   display: grid;

@@ -1,8 +1,9 @@
 const CONFIG = {
-  DEFAULT_BASE_URL: "https://richti03.github.io/skvstatic",
+  DEFAULT_ASSET_BASE_URL: "https://richti03.github.io/skvstatic",
   GITHUB_OWNER: "richti03",
   GITHUB_REPO: "skvstatic",
-  GITHUB_BRANCH: "SkvJsonGenerator"
+  DEFAULT_SOURCE_BRANCH: "main",
+  DEFAULT_TARGET_BRANCH: "skvJsonGenerator"
 };
 
 const linkLabelOptions = [
@@ -230,6 +231,12 @@ const specs = {
 };
 
 const typeSelect = document.querySelector("#typeSelect");
+const sourceBranchSelect = document.querySelector("#sourceBranchSelect");
+const targetBranchInput = document.querySelector("#targetBranchInput");
+const syncBranchesBtn = document.querySelector("#syncBranchesBtn");
+const branchesList = document.querySelector("#branchesList");
+const compareLink = document.querySelector("#compareLink");
+const commitBranchLabel = document.querySelector("#commitBranchLabel");
 const galleryNameWrap = document.querySelector("#galleryNameWrap");
 const galleryNameInput = document.querySelector("#galleryNameInput");
 const confirmGalleryBtn = document.querySelector("#confirmGalleryBtn");
@@ -289,6 +296,16 @@ const selectedEntryImageFiles = new Map();
 const pendingEntryImageRepoDeletes = new Set();
 const detachedEntryImageUploads = new Set();
 let onlineJsonLoaded = false;
+
+function getSourceBranch() {
+  const value = sourceBranchSelect?.value?.trim();
+  return value || CONFIG.DEFAULT_SOURCE_BRANCH;
+}
+
+function getTargetBranch() {
+  const value = targetBranchInput?.value?.trim();
+  return value || CONFIG.DEFAULT_TARGET_BRANCH;
+}
 
 function appendOption(key) {
   const opt = document.createElement("option");
@@ -829,7 +846,7 @@ function updateImagePreviewForInput(input) {
   }
 
   const normalizedRelative = relativeSrc.replace(/^\.\//, "");
-  const absoluteSrc = `${CONFIG.DEFAULT_BASE_URL.replace(/\/$/, "")}/${normalizedRelative}`;
+  const absoluteSrc = `${CONFIG.DEFAULT_ASSET_BASE_URL.replace(/\/$/, "")}/${normalizedRelative}`;
 
   previewEl.dataset.fallbackSrc = relativeSrc;
   previewEl.src = absoluteSrc;
@@ -935,7 +952,7 @@ async function fetchInternalEntryImages(imageInput) {
 
   const owner = CONFIG.GITHUB_OWNER;
   const repo = CONFIG.GITHUB_REPO;
-  const branch = CONFIG.GITHUB_BRANCH;
+  const branch = getTargetBranch();
   const apiUrls = [
     `https://api.github.com/repos/${owner}/${repo}/contents/${prefix}?ref=${encodeURIComponent(branch)}`,
     `https://api.github.com/repos/${owner}/${repo}/contents/${prefix}`
@@ -1371,7 +1388,7 @@ function pickSingleLocalImage() {
 async function fetchInternalGalleryImages() {
   const owner = CONFIG.GITHUB_OWNER;
   const repo = CONFIG.GITHUB_REPO;
-  const branch = CONFIG.GITHUB_BRANCH;
+  const branch = getTargetBranch();
   const folder = getActiveGalleryName();
   const folderPath = `src/img/gallerys/${folder}`;
   const apiUrls = [
@@ -1426,7 +1443,7 @@ async function fetchInternalManagedFiles() {
 
   const owner = CONFIG.GITHUB_OWNER;
   const repo = CONFIG.GITHUB_REPO;
-  const branch = CONFIG.GITHUB_BRANCH;
+  const branch = getTargetBranch();
   const apiUrls = [
     `https://api.github.com/repos/${owner}/${repo}/contents/${prefix}?ref=${encodeURIComponent(branch)}`,
     `https://api.github.com/repos/${owner}/${repo}/contents/${prefix}`
@@ -1517,7 +1534,7 @@ function openInternalGalleryImageDialog(filenames, options = {}) {
 
     const normalizedRelativePrefix = relativePrefix.replace(/\/?$/, "/");
     const relativeSrc = `${normalizedRelativePrefix}${selectedFile}`;
-    const absoluteSrc = `${CONFIG.DEFAULT_BASE_URL.replace(/\/$/, "")}/${relativeSrc.replace(/^\.\//, "")}`;
+    const absoluteSrc = `${CONFIG.DEFAULT_ASSET_BASE_URL.replace(/\/$/, "")}/${relativeSrc.replace(/^\.\//, "")}`;
     galleryInternalImagePreview.dataset.fallbackSrc = relativeSrc;
     galleryInternalImagePreview.src = absoluteSrc;
     galleryInternalImagePreview.alt = `${previewLabel} ${selectedFile}`;
@@ -2298,7 +2315,8 @@ function renderEntries(typeKey, dataList = null, { useTemplate = false } = {}) {
 }
 
 function getFetchUrl() {
-  const base = CONFIG.DEFAULT_BASE_URL.replace(/\/$/, "");
+  const branch = encodeURIComponent(getSourceBranch());
+  const base = `https://raw.githubusercontent.com/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/${branch}`;
 
   if (typeSelect.value === "gallery") {
     const galleryName = getActiveGalleryName();
@@ -2306,6 +2324,73 @@ function getFetchUrl() {
   }
 
   return `${base}/src/data/${specs[typeSelect.value].filename}`;
+}
+
+function updateCompareLink() {
+  if (!compareLink) return;
+  const targetBranch = getTargetBranch();
+  compareLink.href = `https://github.com/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/compare/main...${encodeURIComponent(targetBranch)}`;
+}
+
+function updateCommitBranchLabel() {
+  if (!commitBranchLabel) return;
+  commitBranchLabel.textContent = getTargetBranch();
+}
+
+async function syncBranches() {
+  if (!syncBranchesBtn) return;
+  const previousText = syncBranchesBtn.textContent;
+  syncBranchesBtn.disabled = true;
+  syncBranchesBtn.textContent = "🔄";
+
+  try {
+    const response = await fetch(`https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/branches?per_page=100`, {
+      headers: { Accept: "application/vnd.github+json" }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    const branchNames = Array.isArray(payload) ? payload.map((branch) => branch?.name).filter(Boolean) : [];
+
+    if (sourceBranchSelect) {
+      const previousSource = sourceBranchSelect.value;
+      sourceBranchSelect.innerHTML = "";
+      branchNames.forEach((name) => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        sourceBranchSelect.append(option);
+      });
+      const nextSource = branchNames.includes(previousSource)
+        ? previousSource
+        : branchNames.includes(CONFIG.DEFAULT_SOURCE_BRANCH)
+          ? CONFIG.DEFAULT_SOURCE_BRANCH
+          : branchNames[0] || CONFIG.DEFAULT_SOURCE_BRANCH;
+      sourceBranchSelect.value = nextSource;
+    }
+
+    if (branchesList) {
+      branchesList.innerHTML = "";
+      branchNames.forEach((name) => {
+        const option = document.createElement("option");
+        option.value = name;
+        branchesList.append(option);
+      });
+    }
+
+    if (targetBranchInput && !targetBranchInput.value.trim()) {
+      targetBranchInput.value = CONFIG.DEFAULT_TARGET_BRANCH;
+    }
+    updateCompareLink();
+    updateCommitBranchLabel();
+    syncBranchesBtn.textContent = "✓";
+  } catch (error) {
+    syncBranchesBtn.textContent = "!";
+  } finally {
+    setTimeout(() => {
+      syncBranchesBtn.textContent = previousText;
+      syncBranchesBtn.disabled = false;
+    }, 1600);
+  }
 }
 
 function getDataPath() {
@@ -2609,7 +2694,7 @@ async function commitGeneratedJson() {
 
   const owner = CONFIG.GITHUB_OWNER;
   const repo = CONFIG.GITHUB_REPO;
-  const branch = CONFIG.GITHUB_BRANCH;
+  const branch = getTargetBranch();
   const path = getDataPath();
   prunePendingGalleryDeletes(parsedJson);
   prunePendingManagedDeletes(parsedJson);
@@ -2725,7 +2810,7 @@ async function commitGeneratedJson() {
 
     const commitUrl = commitSha ? `https://github.com/${owner}/${repo}/commit/${commitSha}` : "";
     const statusText = commitUrl
-      ? `Commit erfolgreich: <a href="https://github.com/richti03/skvstatic/compare/SkvJsonGenerator" target="_blank">${commitUrl}</a>`
+      ? `Commit erfolgreich: <a href="https://github.com/${owner}/${repo}/compare/main...${encodeURIComponent(branch)}" target="_blank">${commitUrl}</a>`
       : "Commit erfolgreich erstellt.";
     if (typeSelect.value === "gallery") pendingGalleryRepoDeletes.clear();
     if (typeSelect.value === "gallery") detachedGalleryUploads.clear();
@@ -2870,7 +2955,23 @@ addEntryBtn.addEventListener("click", async () => {
 
 generateBtn.addEventListener("click", validateAndGenerate);
 loadOnlineBtn.addEventListener("click", loadOnlineJson);
+syncBranchesBtn?.addEventListener("click", syncBranches);
 confirmGalleryBtn.addEventListener("click", confirmGalleryName);
+
+sourceBranchSelect?.addEventListener("change", () => {
+  setOnlineJsonLoaded(false);
+});
+
+targetBranchInput?.addEventListener("input", () => {
+  updateCompareLink();
+  updateCommitBranchLabel();
+});
+
+targetBranchInput?.addEventListener("change", () => {
+  if (!targetBranchInput.value.trim()) targetBranchInput.value = CONFIG.DEFAULT_TARGET_BRANCH;
+  updateCompareLink();
+  updateCommitBranchLabel();
+});
 
 galleryNameInput.addEventListener("input", () => {
   if (typeSelect.value !== "gallery") return;
@@ -2998,5 +3099,13 @@ entriesEl.addEventListener("dragend", (event) => {
 });
 
 typeSelect.value = "news";
+if (sourceBranchSelect) {
+  sourceBranchSelect.innerHTML = `<option value="${CONFIG.DEFAULT_SOURCE_BRANCH}">${CONFIG.DEFAULT_SOURCE_BRANCH}</option>`;
+  sourceBranchSelect.value = CONFIG.DEFAULT_SOURCE_BRANCH;
+}
+if (targetBranchInput) targetBranchInput.value = CONFIG.DEFAULT_TARGET_BRANCH;
+updateCompareLink();
+updateCommitBranchLabel();
+syncBranches();
 updateTypeDependentUi();
 renderEntries("news");
