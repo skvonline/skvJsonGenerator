@@ -258,6 +258,22 @@ const galleryDeleteForm = document.querySelector("#galleryDeleteForm");
 const confirmDeleteWithRepoBtn = document.querySelector("#confirmDeleteWithRepoBtn");
 const confirmDeleteEntryOnlyBtn = document.querySelector("#confirmDeleteEntryOnlyBtn");
 const cancelGalleryDeleteBtn = document.querySelector("#cancelGalleryDeleteBtn");
+const galleryReplacePolicyDialog = document.querySelector("#galleryReplacePolicyDialog");
+const galleryReplacePolicyForm = document.querySelector("#galleryReplacePolicyForm");
+const keepOldGalleryImageBtn = document.querySelector("#keepOldGalleryImageBtn");
+const deleteOldGalleryImageBtn = document.querySelector("#deleteOldGalleryImageBtn");
+const cancelReplacePolicyBtn = document.querySelector("#cancelReplacePolicyBtn");
+const gallerySourceDialog = document.querySelector("#gallerySourceDialog");
+const gallerySourceForm = document.querySelector("#gallerySourceForm");
+const selectGallerySourceNewBtn = document.querySelector("#selectGallerySourceNewBtn");
+const selectGallerySourceInternalBtn = document.querySelector("#selectGallerySourceInternalBtn");
+const selectGallerySourceExternalBtn = document.querySelector("#selectGallerySourceExternalBtn");
+const cancelGallerySourceBtn = document.querySelector("#cancelGallerySourceBtn");
+const galleryInternalPickerDialog = document.querySelector("#galleryInternalPickerDialog");
+const galleryInternalPickerForm = document.querySelector("#galleryInternalPickerForm");
+const galleryInternalImageSelect = document.querySelector("#galleryInternalImageSelect");
+const confirmGalleryInternalImageBtn = document.querySelector("#confirmGalleryInternalImageBtn");
+const cancelGalleryInternalImageBtn = document.querySelector("#cancelGalleryInternalImageBtn");
 const scrollTopBtn = document.querySelector("#scrollTopBtn");
 const DEFAULT_GALLERY_NAME = "home-gallery";
 let confirmedGalleryName = "";
@@ -459,7 +475,8 @@ function getCurrentGallerySrcPathsFromInputs() {
   if (typeSelect.value !== "gallery") return new Set();
   const paths = new Set();
   entriesEl.querySelectorAll('.entry [data-field="src"]').forEach((input) => {
-    const filename = getFilenameOnly(input.value);
+    if (input.dataset.gallerySource === "external") return;
+    const filename = getGalleryImageFilenameFromValue(input.value);
     const prefix = input.dataset.pathPrefix || "";
     if (!filename || !prefix) return;
     paths.add(`${prefix}${filename}`.replace(/^\.\//, ""));
@@ -481,7 +498,8 @@ function getGalleryEntrySrcPath(entryEl) {
   if (!entryEl || typeSelect.value !== "gallery") return "";
   const srcInput = entryEl.querySelector('[data-field="src"]');
   if (!srcInput) return "";
-  const filename = getFilenameOnly(srcInput.value);
+  if (srcInput.dataset.gallerySource === "external") return "";
+  const filename = getGalleryImageFilenameFromValue(srcInput.value);
   const prefix = srcInput.dataset.pathPrefix || "";
   if (!filename || !prefix) return "";
   return `${prefix}${filename}`.replace(/^\.\//, "");
@@ -571,11 +589,35 @@ function getFilenameOnly(value) {
   return trimmed.split(/[\\/]/).pop() || "";
 }
 
+function isExternalImagePath(value) {
+  return /^https?:\/\//i.test((value || "").trim());
+}
+
+function getGalleryImageFilenameFromValue(value) {
+  return isExternalImagePath(value) ? "" : getFilenameOnly(value);
+}
+
 function updateImagePreviewForInput(input) {
-  if (!input || input.dataset.filenameOnly !== "true") return;
+  if (!input) return;
   const previewEl = input.closest(".form-field")?.querySelector(".image-preview");
   if (!previewEl) return;
 
+  if (typeSelect.value === "gallery" && input.dataset.field === "src" && input.dataset.gallerySource === "external") {
+    const externalUrl = input.value.trim();
+    if (!externalUrl) {
+      previewEl.classList.add("hidden");
+      previewEl.removeAttribute("src");
+      delete previewEl.dataset.fallbackSrc;
+      return;
+    }
+    previewEl.src = externalUrl;
+    previewEl.alt = "Vorschau externes Bild";
+    previewEl.classList.remove("hidden");
+    delete previewEl.dataset.fallbackSrc;
+    return;
+  }
+
+  if (input.dataset.filenameOnly !== "true") return;
   const filename = getFilenameOnly(input.value);
   const pathPrefix = input.dataset.pathPrefix || "";
   if (!filename || !pathPrefix) {
@@ -604,6 +646,21 @@ function updateImagePreviewForInput(input) {
   previewEl.src = absoluteSrc;
   previewEl.alt = `Vorschau ${filename}`;
   previewEl.classList.remove("hidden");
+}
+
+function setGallerySrcInputMode(srcInput, mode, value) {
+  if (!srcInput) return;
+  srcInput.dataset.gallerySource = mode;
+
+  if (mode === "external") {
+    srcInput.dataset.filenameOnly = "false";
+    srcInput.value = (value || "").trim();
+  } else {
+    srcInput.dataset.filenameOnly = "true";
+    srcInput.value = getFilenameOnly(value || "");
+  }
+
+  updateImagePreviewForInput(srcInput);
 }
 
 function createInput(field, value) {
@@ -749,6 +806,207 @@ function addListItem(field, container, value = {}, onChange = () => {}) {
   onChange();
 }
 
+function openGalleryReplacePolicyDialog() {
+  if (!galleryReplacePolicyDialog || !galleryReplacePolicyForm || typeof galleryReplacePolicyDialog.showModal !== "function") {
+    const shouldDelete = window.confirm("Soll das alte Bild im Git-Repository gelöscht werden? (Empfohlen)");
+    return Promise.resolve(shouldDelete ? "delete" : "keep");
+  }
+
+  return new Promise((resolve) => {
+    const closeDialog = (result = null) => {
+      keepOldGalleryImageBtn?.removeEventListener("click", handleKeep);
+      deleteOldGalleryImageBtn?.removeEventListener("click", handleDelete);
+      cancelReplacePolicyBtn?.removeEventListener("click", handleCancel);
+      galleryReplacePolicyDialog.removeEventListener("cancel", handleCancel);
+      if (galleryReplacePolicyDialog.open) galleryReplacePolicyDialog.close();
+      resolve(result);
+    };
+    const handleKeep = () => closeDialog("keep");
+    const handleDelete = () => closeDialog("delete");
+    const handleCancel = () => closeDialog(null);
+
+    keepOldGalleryImageBtn?.addEventListener("click", handleKeep);
+    deleteOldGalleryImageBtn?.addEventListener("click", handleDelete);
+    cancelReplacePolicyBtn?.addEventListener("click", handleCancel);
+    galleryReplacePolicyDialog.addEventListener("cancel", handleCancel);
+    galleryReplacePolicyDialog.showModal();
+    deleteOldGalleryImageBtn?.focus();
+  });
+}
+
+function openGallerySourceDialog() {
+  if (!gallerySourceDialog || !gallerySourceForm || typeof gallerySourceDialog.showModal !== "function") {
+    const selected = window.prompt("Neue Bildquelle wählen: neu / intern / extern", "neu");
+    const normalized = (selected || "").trim().toLowerCase();
+    if (normalized === "neu") return Promise.resolve("new");
+    if (normalized === "intern") return Promise.resolve("internal");
+    if (normalized === "extern") return Promise.resolve("external");
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve) => {
+    const closeDialog = (result = null) => {
+      selectGallerySourceNewBtn?.removeEventListener("click", handleNew);
+      selectGallerySourceInternalBtn?.removeEventListener("click", handleInternal);
+      selectGallerySourceExternalBtn?.removeEventListener("click", handleExternal);
+      cancelGallerySourceBtn?.removeEventListener("click", handleCancel);
+      gallerySourceDialog.removeEventListener("cancel", handleCancel);
+      if (gallerySourceDialog.open) gallerySourceDialog.close();
+      resolve(result);
+    };
+    const handleNew = () => closeDialog("new");
+    const handleInternal = () => closeDialog("internal");
+    const handleExternal = () => closeDialog("external");
+    const handleCancel = () => closeDialog(null);
+
+    selectGallerySourceNewBtn?.addEventListener("click", handleNew);
+    selectGallerySourceInternalBtn?.addEventListener("click", handleInternal);
+    selectGallerySourceExternalBtn?.addEventListener("click", handleExternal);
+    cancelGallerySourceBtn?.addEventListener("click", handleCancel);
+    gallerySourceDialog.addEventListener("cancel", handleCancel);
+    gallerySourceDialog.showModal();
+    selectGallerySourceNewBtn?.focus();
+  });
+}
+
+function pickSingleLocalImage() {
+  return new Promise((resolve) => {
+    const picker = document.createElement("input");
+    picker.type = "file";
+    picker.accept = "image/*";
+    picker.addEventListener("change", () => {
+      const [file] = [...(picker.files || [])];
+      resolve(file || null);
+    }, { once: true });
+    picker.click();
+  });
+}
+
+async function fetchInternalGalleryImages() {
+  const owner = CONFIG.GITHUB_OWNER;
+  const repo = CONFIG.GITHUB_REPO;
+  const branch = CONFIG.GITHUB_BRANCH;
+  const folder = getActiveGalleryName();
+  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/src/img/gallerys/${encodeURIComponent(folder)}?ref=${encodeURIComponent(branch)}`;
+  const response = await fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } });
+  if (!response.ok) throw new Error(`Ordner konnte nicht geladen werden (HTTP ${response.status}).`);
+
+  const payload = await response.json();
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .filter((item) => item?.type === "file" && typeof item?.name === "string")
+    .map((item) => item.name)
+    .filter((name) => /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(name))
+    .sort((a, b) => a.localeCompare(b, "de"));
+}
+
+function openInternalGalleryImageDialog(filenames) {
+  if (!Array.isArray(filenames) || filenames.length === 0) return Promise.resolve(null);
+
+  if (!galleryInternalPickerDialog || !galleryInternalPickerForm || !galleryInternalImageSelect || typeof galleryInternalPickerDialog.showModal !== "function") {
+    const chosen = window.prompt(`Internes Bild wählen:\n${filenames.join("\n")}`, filenames[0]);
+    return Promise.resolve(chosen && filenames.includes(chosen) ? chosen : null);
+  }
+
+  galleryInternalImageSelect.innerHTML = "";
+  filenames.forEach((filename) => {
+    const option = document.createElement("option");
+    option.value = filename;
+    option.textContent = filename;
+    galleryInternalImageSelect.append(option);
+  });
+
+  return new Promise((resolve) => {
+    const closeDialog = (result = null) => {
+      confirmGalleryInternalImageBtn?.removeEventListener("click", handleConfirm);
+      cancelGalleryInternalImageBtn?.removeEventListener("click", handleCancel);
+      galleryInternalPickerDialog.removeEventListener("cancel", handleCancel);
+      if (galleryInternalPickerDialog.open) galleryInternalPickerDialog.close();
+      resolve(result);
+    };
+    const handleConfirm = () => closeDialog(galleryInternalImageSelect.value || null);
+    const handleCancel = () => closeDialog(null);
+
+    confirmGalleryInternalImageBtn?.addEventListener("click", handleConfirm);
+    cancelGalleryInternalImageBtn?.addEventListener("click", handleCancel);
+    galleryInternalPickerDialog.addEventListener("cancel", handleCancel);
+    galleryInternalPickerDialog.showModal();
+    galleryInternalImageSelect.focus();
+  });
+}
+
+async function startGalleryImageReplacement(entryEl) {
+  const srcInput = entryEl?.querySelector('[data-field="src"]');
+  if (!srcInput) return;
+
+  const previousSrcPath = getGalleryEntrySrcPath(entryEl);
+  let selectedPolicy = null;
+  if (previousSrcPath) {
+    selectedPolicy = await openGalleryReplacePolicyDialog();
+    if (!selectedPolicy) return;
+  }
+
+  const source = await openGallerySourceDialog();
+  if (!source) return;
+
+  const applyOldFilePolicy = () => {
+    if (!previousSrcPath || !selectedPolicy) return;
+    if (selectedPolicy === "delete") {
+      pendingGalleryRepoDeletes.add(previousSrcPath);
+      detachedGalleryUploads.delete(previousSrcPath);
+    } else {
+      pendingGalleryRepoDeletes.delete(previousSrcPath);
+      if (selectedGalleryFiles.has(previousSrcPath)) detachedGalleryUploads.add(previousSrcPath);
+    }
+  };
+
+  if (source === "new") {
+    const file = await pickSingleLocalImage();
+    if (!file) return;
+    applyOldFilePolicy();
+    rememberGalleryFiles([file]);
+    const repoPath = `src/img/gallerys/${getActiveGalleryName()}/${getFilenameOnly(file.name)}`;
+    pendingGalleryRepoDeletes.delete(repoPath);
+    detachedGalleryUploads.delete(repoPath);
+    setGallerySrcInputMode(srcInput, "repo", file.name);
+  }
+
+  if (source === "internal") {
+    try {
+      const internalImages = await fetchInternalGalleryImages();
+      if (internalImages.length === 0) {
+        window.alert("Im gewählten Galerieordner wurden keine Bilder gefunden.");
+        return;
+      }
+      const selectedFile = await openInternalGalleryImageDialog(internalImages);
+      if (!selectedFile) return;
+      applyOldFilePolicy();
+      const repoPath = `src/img/gallerys/${getActiveGalleryName()}/${getFilenameOnly(selectedFile)}`;
+      pendingGalleryRepoDeletes.delete(repoPath);
+      detachedGalleryUploads.delete(repoPath);
+      setGallerySrcInputMode(srcInput, "repo", selectedFile);
+    } catch (error) {
+      window.alert(`Interne Bilder konnten nicht geladen werden: ${error.message}`);
+      return;
+    }
+  }
+
+  if (source === "external") {
+    const link = window.prompt("Bitte externen Bildlink eingeben (https://...):", srcInput.value.trim());
+    if (!link) return;
+    if (!isExternalImagePath(link)) {
+      window.alert("Bitte eine vollständige http(s)-URL angeben.");
+      return;
+    }
+    applyOldFilePolicy();
+    setGallerySrcInputMode(srcInput, "external", link.trim());
+  }
+
+  const index = [...entriesEl.querySelectorAll(".entry")].indexOf(entryEl);
+  refreshEntrySummary(entryEl, index);
+  resetValidationUi();
+}
+
 function createListBlock(field, value = []) {
   const block = document.createElement("div");
   block.className = "list-block";
@@ -866,6 +1124,11 @@ function readEntry(entryEl) {
 
     if (type === "csv") {
       data[name] = value.split(",").map((part) => part.trim()).filter(Boolean);
+      return;
+    }
+
+    if (typeSelect.value === "gallery" && name === "src" && input.dataset.gallerySource === "external") {
+      data[name] = value;
       return;
     }
 
@@ -1239,7 +1502,20 @@ function addEntry(defaults = {}, { expand = true, insert = "auto", scrollToEntry
     if (field.type === "list" || field.type === "pairList") {
       body.append(createListBlock(effectiveField, defaults[field.name]));
     } else {
-      const { wrapper } = createInput(effectiveField, defaults[field.name]);
+      const { wrapper, input } = createInput(effectiveField, defaults[field.name]);
+      if (typeKey === "gallery" && field.name === "src") {
+        const srcValue = typeof defaults[field.name] === "string" ? defaults[field.name] : "";
+        const sourceMode = isExternalImagePath(srcValue) ? "external" : "repo";
+        input.readOnly = true;
+        setGallerySrcInputMode(input, sourceMode, srcValue);
+
+        const changeBtn = document.createElement("button");
+        changeBtn.type = "button";
+        changeBtn.textContent = "Bild wechseln";
+        changeBtn.className = "secondary-button";
+        changeBtn.addEventListener("click", () => startGalleryImageReplacement(entry));
+        wrapper.append(changeBtn);
+      }
       body.append(wrapper);
     }
   });

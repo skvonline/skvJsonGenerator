@@ -117,6 +117,43 @@
       </form>
     </dialog>
 
+    <dialog id="galleryReplacePolicyDialog" class="confirm-dialog">
+      <form id="galleryReplacePolicyForm" method="dialog" class="confirm-dialog-form">
+        <h2>Altes Bild behandeln</h2>
+        <p>Soll das bisherige Bild im Git-Repository behalten oder gelöscht werden?</p>
+        <div class="actions">
+          <button id="keepOldGalleryImageBtn" type="button" class="secondary-button">Im Git behalten</button>
+          <button id="deleteOldGalleryImageBtn" type="button">Im Git löschen (empfohlen)</button>
+          <button id="cancelReplacePolicyBtn" type="button" class="secondary-button">Abbrechen</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="gallerySourceDialog" class="confirm-dialog">
+      <form id="gallerySourceForm" method="dialog" class="confirm-dialog-form">
+        <h2>Neue Bildquelle wählen</h2>
+        <p>Bitte auswählen, woher das neue Bild kommen soll.</p>
+        <div class="actions">
+          <button id="selectGallerySourceNewBtn" type="button">1. Neu</button>
+          <button id="selectGallerySourceInternalBtn" type="button" class="secondary-button">2. Intern</button>
+          <button id="selectGallerySourceExternalBtn" type="button" class="secondary-button">3. Extern</button>
+          <button id="cancelGallerySourceBtn" type="button" class="secondary-button">Abbrechen</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="galleryInternalPickerDialog" class="confirm-dialog">
+      <form id="galleryInternalPickerForm" method="dialog" class="confirm-dialog-form">
+        <h2>Internes Bild auswählen</h2>
+        <label for="galleryInternalImageSelect">Bilder aus dem Galerieordner</label>
+        <select id="galleryInternalImageSelect"></select>
+        <div class="actions">
+          <button id="confirmGalleryInternalImageBtn" type="button">Bild übernehmen</button>
+          <button id="cancelGalleryInternalImageBtn" type="button" class="secondary-button">Abbrechen</button>
+        </div>
+      </form>
+    </dialog>
+
     <script src="app.js"></script>
   </body>
 </html>
