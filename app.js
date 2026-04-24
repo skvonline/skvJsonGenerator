@@ -231,7 +231,7 @@ const specs = {
 };
 
 const typeSelect = document.querySelector("#typeSelect");
-const sourceBranchInput = document.querySelector("#sourceBranchInput");
+const sourceBranchSelect = document.querySelector("#sourceBranchSelect");
 const targetBranchInput = document.querySelector("#targetBranchInput");
 const syncBranchesBtn = document.querySelector("#syncBranchesBtn");
 const branchesList = document.querySelector("#branchesList");
@@ -298,7 +298,7 @@ const detachedEntryImageUploads = new Set();
 let onlineJsonLoaded = false;
 
 function getSourceBranch() {
-  const value = sourceBranchInput?.value?.trim();
+  const value = sourceBranchSelect?.value?.trim();
   return value || CONFIG.DEFAULT_SOURCE_BRANCH;
 }
 
@@ -2341,7 +2341,7 @@ async function syncBranches() {
   if (!syncBranchesBtn) return;
   const previousText = syncBranchesBtn.textContent;
   syncBranchesBtn.disabled = true;
-  syncBranchesBtn.textContent = "Synchronisiere...";
+  syncBranchesBtn.textContent = "🔄";
 
   try {
     const response = await fetch(`https://api.github.com/repos/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/branches?per_page=100`, {
@@ -2350,6 +2350,23 @@ async function syncBranches() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     const branchNames = Array.isArray(payload) ? payload.map((branch) => branch?.name).filter(Boolean) : [];
+
+    if (sourceBranchSelect) {
+      const previousSource = sourceBranchSelect.value;
+      sourceBranchSelect.innerHTML = "";
+      branchNames.forEach((name) => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        sourceBranchSelect.append(option);
+      });
+      const nextSource = branchNames.includes(previousSource)
+        ? previousSource
+        : branchNames.includes(CONFIG.DEFAULT_SOURCE_BRANCH)
+          ? CONFIG.DEFAULT_SOURCE_BRANCH
+          : branchNames[0] || CONFIG.DEFAULT_SOURCE_BRANCH;
+      sourceBranchSelect.value = nextSource;
+    }
 
     if (branchesList) {
       branchesList.innerHTML = "";
@@ -2360,13 +2377,12 @@ async function syncBranches() {
       });
     }
 
-    if (sourceBranchInput && !sourceBranchInput.value.trim()) sourceBranchInput.value = CONFIG.DEFAULT_SOURCE_BRANCH;
     if (targetBranchInput && !targetBranchInput.value.trim()) targetBranchInput.value = CONFIG.DEFAULT_TARGET_BRANCH;
     updateCompareLink();
     updateCommitBranchLabel();
-    syncBranchesBtn.textContent = "Synchronisiert";
+    syncBranchesBtn.textContent = "✓";
   } catch (error) {
-    syncBranchesBtn.textContent = `Sync fehlgeschlagen (${error.message})`;
+    syncBranchesBtn.textContent = "!";
   } finally {
     setTimeout(() => {
       syncBranchesBtn.textContent = previousText;
@@ -2940,8 +2956,8 @@ loadOnlineBtn.addEventListener("click", loadOnlineJson);
 syncBranchesBtn?.addEventListener("click", syncBranches);
 confirmGalleryBtn.addEventListener("click", confirmGalleryName);
 
-sourceBranchInput?.addEventListener("change", () => {
-  if (!sourceBranchInput.value.trim()) sourceBranchInput.value = CONFIG.DEFAULT_SOURCE_BRANCH;
+sourceBranchSelect?.addEventListener("change", () => {
+  setOnlineJsonLoaded(false);
 });
 
 targetBranchInput?.addEventListener("input", updateCompareLink);
@@ -3078,8 +3094,11 @@ entriesEl.addEventListener("dragend", (event) => {
 });
 
 typeSelect.value = "news";
-if (sourceBranchInput) sourceBranchInput.value = CONFIG.DEFAULT_SOURCE_BRANCH;
 if (targetBranchInput) targetBranchInput.value = CONFIG.DEFAULT_TARGET_BRANCH;
+if (sourceBranchSelect) {
+  sourceBranchSelect.innerHTML = `<option value="${CONFIG.DEFAULT_SOURCE_BRANCH}">${CONFIG.DEFAULT_SOURCE_BRANCH}</option>`;
+  sourceBranchSelect.value = CONFIG.DEFAULT_SOURCE_BRANCH;
+}
 updateCompareLink();
 updateCommitBranchLabel();
 syncBranches();
