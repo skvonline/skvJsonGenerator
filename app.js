@@ -1,7 +1,7 @@
 const CONFIG = {
-  DEFAULT_ASSET_BASE_URL: "https://richti03.github.io/skvstatic",
-  GITHUB_OWNER: "richti03",
-  GITHUB_REPO: "skvstatic",
+  DEFAULT_ASSET_BASE_URL: "https://skvonline.github.io/",
+  GITHUB_OWNER: "skvonline",
+  GITHUB_REPO: "skvonline.github.io",
   DEFAULT_SOURCE_BRANCH: "main",
   DEFAULT_TARGET_BRANCH: "skvJsonGenerator"
 };
