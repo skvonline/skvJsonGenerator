@@ -2536,9 +2536,9 @@ async function commitGalleryDeleteDirect() {
   const owner = CONFIG.GITHUB_OWNER; const repo = CONFIG.GITHUB_REPO; const branch = getTargetBranch();
   galleryDeleteCommitBtn.disabled = true;
   try {
-    await ensureBranchExists({ owner, repo, branch, token: commitInput.token });
+    await ensureBranchExists({ owner, repo, branch, token: commitInput.token, baseBranch: getSourceBranch() });
     const commitSha = await createSingleGitHubCommit({ owner, repo, branch, token: commitInput.token, message: commitInput.commitMessage, files: artifacts.files });
-    setCommitStatus(`Galerie gelöscht: <a href="https://github.com/${owner}/${repo}/commit/${commitSha}" target="_blank">Commit öffnen</a><br>Bitte kontrollieren sie, dass die eben gelöscht Galerie "${technicalName}" nicht mehr in der gallery-overview angegeben ist.`, "success");
+    setCommitStatus(`Galerie gelöscht: <a href="https://github.com/${owner}/${repo}/compare/${encodeURIComponent(getSourceBranch())}...${encodeURIComponent(branch)}" target="_blank">Changes ansehen</a><br>Bitte kontrollieren sie, dass die eben gelöscht Galerie "${technicalName}" nicht mehr in der gallery-overview angegeben ist.`, "success");
     if (galleryDeleteScaffoldDialog?.open) galleryDeleteScaffoldDialog.close();
   } catch (error) {
     setCommitStatus(`Galerie-Löschung fehlgeschlagen: ${error.message}`, "error");
@@ -2547,7 +2547,7 @@ async function commitGalleryDeleteDirect() {
 function updateCompareLink() {
   if (!compareLink) return;
   const targetBranch = getTargetBranch();
-  compareLink.href = `https://github.com/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/compare/main...${encodeURIComponent(targetBranch)}`;
+  compareLink.href = `https://github.com/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/compare/${encodeURIComponent(getSourceBranch())}...${encodeURIComponent(targetBranch)}`;
 }
 
 function updateCommitBranchLabel() {
@@ -2825,11 +2825,11 @@ async function getBranchHeadSha({ owner, repo, branch, token }) {
   return payload?.object?.sha || null;
 }
 
-async function createBranchFromDefault({ owner, repo, branch, token }) {
-  const defaultBranch = await getRepositoryDefaultBranch({ owner, repo, token });
-  const baseSha = await getBranchHeadSha({ owner, repo, branch: defaultBranch, token });
+async function createBranchFromDefault({ owner, repo, branch, token, baseBranch }) {
+  const sourceBranch = (baseBranch || getSourceBranch() || CONFIG.DEFAULT_SOURCE_BRANCH).trim();
+  const baseSha = await getBranchHeadSha({ owner, repo, branch: sourceBranch, token });
   if (!baseSha) {
-    throw new Error(`Default-Branch '${defaultBranch}' konnte nicht aufgelöst werden.`);
+    throw new Error(`Basis-Branch '${sourceBranch}' konnte nicht aufgelöst werden.`);
   }
 
   const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs`, {
@@ -2854,10 +2854,10 @@ async function createBranchFromDefault({ owner, repo, branch, token }) {
   }
 }
 
-async function ensureBranchExists({ owner, repo, branch, token }) {
+async function ensureBranchExists({ owner, repo, branch, token, baseBranch }) {
   const existingSha = await getBranchHeadSha({ owner, repo, branch, token });
   if (existingSha) return;
-  await createBranchFromDefault({ owner, repo, branch, token });
+  await createBranchFromDefault({ owner, repo, branch, token, baseBranch });
 }
 
 function openCommitDialog(defaultMessage) {
@@ -2924,13 +2924,13 @@ async function commitGalleryCreateDirect() {
   galleryCreateCommitBtn.disabled = true;
   setCommitStatus("Galerie-Commit wird vorbereitet...");
   try {
-    await ensureBranchExists({ owner, repo, branch, token: commitInput.token });
+    await ensureBranchExists({ owner, repo, branch, token: commitInput.token, baseBranch: getSourceBranch() });
     const commitSha = await createSingleGitHubCommit({
       owner, repo, branch, token: commitInput.token,
       message: commitInput.commitMessage,
       files: artifacts.files
     });
-    setCommitStatus(`Galerie erfolgreich erstellt: <a href="https://github.com/${owner}/${repo}/commit/${commitSha}" target="_blank">Commit öffnen</a>`, "success");
+    setCommitStatus(`Galerie erfolgreich erstellt: <a href="https://github.com/${owner}/${repo}/compare/${encodeURIComponent(getSourceBranch())}...${encodeURIComponent(branch)}" target="_blank">Changes ansehen</a>`, "success");
     if (galleryCreateDialog?.open) galleryCreateDialog.close();
   } catch (error) {
     setCommitStatus(`Galerie-Commit fehlgeschlagen: ${error.message}`, "error");
@@ -2977,7 +2977,7 @@ async function commitGeneratedJson() {
   setCommitStatus("Branch wird geprüft...");
 
   try {
-    await ensureBranchExists({ owner, repo, branch, token: commitInput.token });
+    await ensureBranchExists({ owner, repo, branch, token: commitInput.token, baseBranch: getSourceBranch() });
     setCommitStatus("Commit wird erstellt...");
     const normalizedJson = JSON.stringify(parsedJson, null, 2);
     const filesForCommit = [
@@ -3077,7 +3077,7 @@ async function commitGeneratedJson() {
 
     const commitUrl = commitSha ? `https://github.com/${owner}/${repo}/commit/${commitSha}` : "";
     const statusText = commitUrl
-      ? `Commit erfolgreich: <a href="https://github.com/${owner}/${repo}/compare/main...${encodeURIComponent(branch)}" target="_blank">${commitUrl}</a>`
+      ? `Commit erfolgreich: <a href="https://github.com/${owner}/${repo}/compare/${encodeURIComponent(getSourceBranch())}...${encodeURIComponent(branch)}" target="_blank">Changes ansehen</a>`
       : "Commit erfolgreich erstellt.";
     if (typeSelect.value === "gallery") pendingGalleryRepoDeletes.clear();
     if (typeSelect.value === "gallery") detachedGalleryUploads.clear();
