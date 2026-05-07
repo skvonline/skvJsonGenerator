@@ -216,6 +216,22 @@ const specs = {
       deleteAt: "2026-05-09-16:30"
     }
   },
+  "gallery-overview": {
+    filename: "gallery-overview.json",
+    summaryKeys: ["name", "directory"],
+    fields: [
+      { name: "name", type: "text", required: true },
+      { name: "publishAt", type: "datetime", placeholder: "JJJJ-MM-TT-HH:mm" },
+      { name: "deleteAt", type: "datetime", required: true, placeholder: "JJJJ-MM-TT-HH:mm" },
+      { name: "directory", type: "text", required: true }
+    ],
+    template: {
+      name: "Fasching 2026",
+      publishAt: "2026-05-04-10:00",
+      deleteAt: "2028-05-05-10:00",
+      directory: "fasching26"
+    }
+  },
   gallery: {
     filename: "gallerys/{xyz}.json",
     summaryKeys: ["src", "alt"],
@@ -296,6 +312,7 @@ const selectedEntryImageFiles = new Map();
 const pendingEntryImageRepoDeletes = new Set();
 const detachedEntryImageUploads = new Set();
 let onlineJsonLoaded = false;
+let pendingGalleryScaffoldFiles = [];
 
 function getSourceBranch() {
   const value = sourceBranchSelect?.value?.trim();
@@ -2326,6 +2343,51 @@ function getFetchUrl() {
   return `${base}/src/data/${specs[typeSelect.value].filename}`;
 }
 
+
+
+function buildGalleryScaffoldPreview(mode) {
+  const technicalNameRaw = window.prompt("Technischer Name der Galerie (Datei/Ordnername):", "");
+  if (!technicalNameRaw) return null;
+  const technicalName = technicalNameRaw.trim().toLowerCase().replace(/[^a-z0-9-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  if (!technicalName) { window.alert("Ungültiger technischer Name."); return null; }
+  const readableName = mode === "create" ? (window.prompt("Leserlicher Name der Galerie:", "") || "").trim() : "";
+  if (mode === "create" && !readableName) { window.alert("Leserlicher Name ist erforderlich."); return null; }
+
+  if (mode === "create") {
+    const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>SKV | ${readableName}</title>
+    <meta name="description" content="Bildergalerie des Sandersdorfer Karnevalsverein e.V."/>
+    <meta name="gallery-source" content="../../src/data/gallerys/${technicalName}.json"/>
+    <link rel="stylesheet" href="../../src/css/style.css"/>
+    <link rel="stylesheet" href="../../src/css/gallery-detail.css"/>
+    <link rel="icon" href="../../src/img/logo.png"/>
+</head>
+<body data-page="legal">
+<div id="header-component"></div>
+<main class="section legal-page"><section class="container legal-card"><h1>${readableName}</h1><div id="gallery-grid" class="grid cards-3 gallery-grid" aria-live="polite"></div></section></main>
+<div id="footer-component"></div>
+<script src="../../src/js/gallery-detail.js"></script>
+<script src="../../src/js/script.js"></script>
+</body>
+</html>
+`;
+    pendingGalleryScaffoldFiles = [
+      { path: `galerie/${technicalName}/index.html`, contentBase64: toBase64Utf8(html + "\n") },
+      { path: `src/data/gallerys/${technicalName}.json`, contentBase64: toBase64Utf8("[]\n") }
+    ];
+    return {technicalName, readableName, mode, preview:[`galerie/${technicalName}/`,`galerie/${technicalName}/index.html`,`src/data/gallerys/${technicalName}.json`,`src/img/gallerys/${technicalName}/`]};
+  }
+
+  pendingGalleryScaffoldFiles = [
+    { path: `galerie/${technicalName}/index.html`, delete: true },
+    { path: `src/data/gallerys/${technicalName}.json`, delete: true }
+  ];
+  return {technicalName, mode, preview:[`galerie/${technicalName}/`,`galerie/${technicalName}/index.html`,`src/data/gallerys/${technicalName}.json`,`src/img/gallerys/${technicalName}/**` ]};
+}
 function updateCompareLink() {
   if (!compareLink) return;
   const targetBranch = getTargetBranch();
@@ -2715,7 +2777,8 @@ async function commitGeneratedJson() {
     setCommitStatus("Commit wird erstellt...");
     const normalizedJson = JSON.stringify(parsedJson, null, 2);
     const filesForCommit = [
-      { path, contentBase64: toBase64Utf8(`${normalizedJson}\n`) }
+      { path, contentBase64: toBase64Utf8(`${normalizedJson}\n`) },
+      ...pendingGalleryScaffoldFiles
     ];
 
     if (typeSelect.value === "gallery") {
@@ -2869,6 +2932,7 @@ typeSelect.addEventListener("change", () => {
   if (typeSelect.value === "gallery" && !galleryNameConfirmed) {
     galleryNameInput.value = DEFAULT_GALLERY_NAME;
   }
+  pendingGalleryScaffoldFiles = [];
   updateTypeDependentUi();
   renderEntries(typeSelect.value);
 });
@@ -2953,6 +3017,20 @@ addEntryBtn.addEventListener("click", async () => {
   }
 });
 
+const createGalleryScaffoldBtn = document.querySelector("#createGalleryScaffoldBtn");
+const deleteGalleryScaffoldBtn = document.querySelector("#deleteGalleryScaffoldBtn");
+createGalleryScaffoldBtn?.addEventListener("click", () => {
+  const result = buildGalleryScaffoldPreview("create");
+  if (!result) return;
+  window.alert(`Vorschau neue Galerie:\n${result.preview.join("\n")}`);
+  setCommitStatus(`Galerie <strong>${result.technicalName}</strong> vorbereitet. Jetzt validieren/committen.`);
+});
+deleteGalleryScaffoldBtn?.addEventListener("click", () => {
+  const result = buildGalleryScaffoldPreview("delete");
+  if (!result) return;
+  window.alert(`Vorschau Löschung:\n${result.preview.join("\n")}`);
+  setCommitStatus(`Löschung für Galerie <strong>${result.technicalName}</strong> vorbereitet. Nach Commit bitte gallery-overview prüfen.`);
+});
 generateBtn.addEventListener("click", validateAndGenerate);
 loadOnlineBtn.addEventListener("click", loadOnlineJson);
 syncBranchesBtn?.addEventListener("click", syncBranches);
