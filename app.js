@@ -298,6 +298,15 @@ const galleryInternalImagePreview = document.querySelector("#galleryInternalImag
 const confirmGalleryInternalImageBtn = document.querySelector("#confirmGalleryInternalImageBtn");
 const cancelGalleryInternalImageBtn = document.querySelector("#cancelGalleryInternalImageBtn");
 const scrollTopBtn = document.querySelector("#scrollTopBtn");
+const galleryCreateDialog = document.querySelector("#galleryCreateDialog");
+const galleryCreateTechName = document.querySelector("#galleryCreateTechName");
+const galleryCreateDisplayName = document.querySelector("#galleryCreateDisplayName");
+const galleryCreatePreviewPaths = document.querySelector("#galleryCreatePreviewPaths");
+const galleryCreatePreviewHtml = document.querySelector("#galleryCreatePreviewHtml");
+const galleryCreatePreviewJson = document.querySelector("#galleryCreatePreviewJson");
+const galleryCreatePreviewBtn = document.querySelector("#galleryCreatePreviewBtn");
+const galleryCreateCommitBtn = document.querySelector("#galleryCreateCommitBtn");
+const galleryCreateCancelBtn = document.querySelector("#galleryCreateCancelBtn");
 const DEFAULT_GALLERY_NAME = "home-gallery";
 const MANAGED_FILE_TYPES = new Set(["vorstand", "elferrat", "royals", "downloads"]);
 let confirmedGalleryName = "";
@@ -2398,16 +2407,12 @@ function getFetchUrl() {
 
 
 
-function buildGalleryScaffoldPreview(mode) {
-  const technicalNameRaw = window.prompt("Technischer Name der Galerie (Datei/Ordnername):", "");
-  if (!technicalNameRaw) return null;
-  const technicalName = technicalNameRaw.trim().toLowerCase().replace(/[^a-z0-9-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-  if (!technicalName) { window.alert("Ungültiger technischer Name."); return null; }
-  const readableName = mode === "create" ? (window.prompt("Leserlicher Name der Galerie:", "") || "").trim() : "";
-  if (mode === "create" && !readableName) { window.alert("Leserlicher Name ist erforderlich."); return null; }
+function sanitizeGalleryTechnicalName(raw) {
+  return String(raw || "").trim().toLowerCase().replace(/[^a-z0-9-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
 
-  if (mode === "create") {
-    const html = `<!DOCTYPE html>
+function buildGalleryCreateArtifacts(technicalName, readableName) {
+  const html = `<!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8"/>
@@ -2421,26 +2426,54 @@ function buildGalleryScaffoldPreview(mode) {
 </head>
 <body data-page="legal">
 <div id="header-component"></div>
-<main class="section legal-page"><section class="container legal-card"><h1>${readableName}</h1><div id="gallery-grid" class="grid cards-3 gallery-grid" aria-live="polite"></div></section></main>
+
+<main class="section legal-page">
+    <section class="container legal-card">
+        <h1>${readableName}</h1>
+        <div id="gallery-grid" class="grid cards-3 gallery-grid" aria-live="polite"></div>
+    </section>
+</main>
+
 <div id="footer-component"></div>
+
+<div id="gallery-lightbox" class="gallery-lightbox" aria-hidden="true">
+    <button type="button" class="gallery-lightbox-backdrop" id="gallery-lightbox-backdrop" aria-label="Vorschau schließen"></button>
+    <div class="gallery-lightbox-dialog" role="dialog" aria-modal="true" aria-label="Bildvorschau">
+        <div class="gallery-lightbox-frame">
+            <img id="gallery-lightbox-image" class="gallery-lightbox-image" src="" alt=""/>
+            <p id="gallery-lightbox-caption" class="gallery-lightbox-caption"></p>
+        </div>
+        <div class="gallery-lightbox-controls">
+            <button type="button" class="gallery-lightbox-nav" id="gallery-lightbox-prev" aria-label="Vorheriges Bild">◀</button>
+            <button type="button" class="gallery-lightbox-close" id="gallery-lightbox-close" aria-label="Vorschau schließen">Schließen</button>
+            <button type="button" class="gallery-lightbox-nav" id="gallery-lightbox-next" aria-label="Nächstes Bild">▶</button>
+        </div>
+    </div>
+</div>
+
 <script src="../../src/js/gallery-detail.js"></script>
 <script src="../../src/js/script.js"></script>
 </body>
 </html>
 `;
-    pendingGalleryScaffoldFiles = [
-      { path: `galerie/${technicalName}/index.html`, contentBase64: toBase64Utf8(html + "\n") },
+  return {
+    technicalName,
+    readableName,
+    files: [
+      { path: `galerie/${technicalName}/index.html`, contentBase64: toBase64Utf8(html) },
       { path: `src/data/gallerys/${technicalName}.json`, contentBase64: toBase64Utf8("[]\n") }
-    ];
-    return {technicalName, readableName, mode, preview:[`galerie/${technicalName}/`,`galerie/${technicalName}/index.html`,`src/data/gallerys/${technicalName}.json`,`src/img/gallerys/${technicalName}/`]};
-  }
-
-  pendingGalleryScaffoldFiles = [
-    { path: `galerie/${technicalName}/index.html`, delete: true },
-    { path: `src/data/gallerys/${technicalName}.json`, delete: true }
-  ];
-  return {technicalName, mode, preview:[`galerie/${technicalName}/`,`galerie/${technicalName}/index.html`,`src/data/gallerys/${technicalName}.json`,`src/img/gallerys/${technicalName}/**` ]};
+    ],
+    previewPaths: [
+      `galerie/${technicalName}/`,
+      `galerie/${technicalName}/index.html`,
+      `src/data/gallerys/${technicalName}.json`,
+      `src/img/gallerys/${technicalName}/`
+    ],
+    html,
+    json: "[]"
+  };
 }
+
 function updateCompareLink() {
   if (!compareLink) return;
   const targetBranch = getTargetBranch();
@@ -2798,6 +2831,53 @@ function openCommitDialog(defaultMessage) {
   });
 }
 
+
+async function commitGalleryCreateDirect() {
+  if (!galleryCreateTechName || !galleryCreateDisplayName) return;
+  const technicalName = sanitizeGalleryTechnicalName(galleryCreateTechName.value);
+  const readableName = galleryCreateDisplayName.value.trim();
+  if (!technicalName || !readableName) {
+    window.alert("Bitte technischen und leserlichen Namen eingeben.");
+    return;
+  }
+  const artifacts = buildGalleryCreateArtifacts(technicalName, readableName);
+  galleryCreatePreviewPaths.textContent = artifacts.previewPaths.join("\n");
+  galleryCreatePreviewHtml.textContent = artifacts.html;
+  galleryCreatePreviewJson.textContent = artifacts.json;
+
+  const commitInput = await openCommitDialog(`Create gallery scaffold for ${technicalName}`);
+  if (!commitInput) return;
+
+  const owner = CONFIG.GITHUB_OWNER;
+  const repo = CONFIG.GITHUB_REPO;
+  const branch = getTargetBranch();
+  galleryCreateCommitBtn.disabled = true;
+  setCommitStatus("Galerie-Commit wird vorbereitet...");
+  try {
+    await ensureBranchExists({ owner, repo, branch, token: commitInput.token });
+    const commitSha = await createSingleGitHubCommit({
+      owner, repo, branch, token: commitInput.token,
+      message: commitInput.commitMessage,
+      files: artifacts.files
+    });
+    setCommitStatus(`Galerie erfolgreich erstellt: <a href="https://github.com/${owner}/${repo}/commit/${commitSha}" target="_blank">Commit öffnen</a>`, "success");
+    if (galleryCreateDialog?.open) galleryCreateDialog.close();
+  } catch (error) {
+    setCommitStatus(`Galerie-Commit fehlgeschlagen: ${error.message}`, "error");
+  } finally {
+    galleryCreateCommitBtn.disabled = false;
+  }
+}
+
+function openGalleryCreateDialog() {
+  if (!galleryCreateDialog || typeof galleryCreateDialog.showModal !== "function") return;
+  galleryCreateTechName.value = "";
+  galleryCreateDisplayName.value = "";
+  galleryCreatePreviewPaths.textContent = "";
+  galleryCreatePreviewHtml.textContent = "";
+  galleryCreatePreviewJson.textContent = "";
+  galleryCreateDialog.showModal();
+}
 async function commitGeneratedJson() {
   pruneUnusedSelectedGalleryFiles();
   pruneUnusedSelectedManagedFiles();
@@ -3075,17 +3155,25 @@ addEntryBtn.addEventListener("click", async () => {
 const createGalleryScaffoldBtn = document.querySelector("#createGalleryScaffoldBtn");
 const deleteGalleryScaffoldBtn = document.querySelector("#deleteGalleryScaffoldBtn");
 createGalleryScaffoldBtn?.addEventListener("click", () => {
-  const result = buildGalleryScaffoldPreview("create");
-  if (!result) return;
-  window.alert(`Vorschau neue Galerie:\n${result.preview.join("\n")}`);
-  setCommitStatus(`Galerie <strong>${result.technicalName}</strong> vorbereitet. Jetzt validieren/committen.`);
+  openGalleryCreateDialog();
 });
 deleteGalleryScaffoldBtn?.addEventListener("click", () => {
-  const result = buildGalleryScaffoldPreview("delete");
-  if (!result) return;
-  window.alert(`Vorschau Löschung:\n${result.preview.join("\n")}`);
-  setCommitStatus(`Löschung für Galerie <strong>${result.technicalName}</strong> vorbereitet. Nach Commit bitte gallery-overview prüfen.`);
+  window.alert("Löschen folgt im nächsten Schritt (9.4.2).");
 });
+galleryCreatePreviewBtn?.addEventListener("click", () => {
+  const technicalName = sanitizeGalleryTechnicalName(galleryCreateTechName?.value);
+  const readableName = galleryCreateDisplayName?.value?.trim() || "";
+  if (!technicalName || !readableName) {
+    window.alert("Bitte technischen und leserlichen Namen eingeben.");
+    return;
+  }
+  const artifacts = buildGalleryCreateArtifacts(technicalName, readableName);
+  galleryCreatePreviewPaths.textContent = artifacts.previewPaths.join("\n");
+  galleryCreatePreviewHtml.textContent = artifacts.html;
+  galleryCreatePreviewJson.textContent = artifacts.json;
+});
+galleryCreateCommitBtn?.addEventListener("click", commitGalleryCreateDirect);
+galleryCreateCancelBtn?.addEventListener("click", () => { if (galleryCreateDialog?.open) galleryCreateDialog.close(); });
 generateBtn.addEventListener("click", validateAndGenerate);
 loadOnlineBtn.addEventListener("click", loadOnlineJson);
 syncBranchesBtn?.addEventListener("click", syncBranches);

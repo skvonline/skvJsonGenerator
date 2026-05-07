@@ -191,6 +191,28 @@
       </form>
     </dialog>
 
+
+    <dialog id="galleryCreateDialog" class="confirm-dialog">
+      <form id="galleryCreateForm" method="dialog" class="confirm-dialog-form">
+        <h2>Neue Galerie anlegen</h2>
+        <label for="galleryCreateTechName">Technischer Name</label>
+        <input id="galleryCreateTechName" type="text" placeholder="z. B. fasching26" required />
+        <label for="galleryCreateDisplayName">Leserlicher Name</label>
+        <input id="galleryCreateDisplayName" type="text" placeholder="z. B. Fasching 2026" required />
+        <p><strong>Vorschau Dateien</strong></p>
+        <pre id="galleryCreatePreviewPaths"></pre>
+        <p><strong>Vorschau index.html</strong></p>
+        <pre id="galleryCreatePreviewHtml"></pre>
+        <p><strong>Vorschau JSON</strong></p>
+        <pre id="galleryCreatePreviewJson"></pre>
+        <div class="actions">
+          <button id="galleryCreatePreviewBtn" type="button">Vorschau aktualisieren</button>
+          <button id="galleryCreateCommitBtn" type="button">Direkt committen</button>
+          <button id="galleryCreateCancelBtn" type="button" class="secondary-button">Schließen</button>
+        </div>
+      </form>
+    </dialog>
+
     <script src="app.js"></script>
   </body>
 </html>
