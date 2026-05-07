@@ -368,22 +368,55 @@ Unterstützte Icons:
 
 ---
 
-## 8) Datei: `gallerys/{xyz}.json`
+## 8) Datei: `gallery-overview.json`
 
-Pfad: `src/data/gallerys/{xyz}.json`
+Pfad: `src/data/gallery-overview.json`
 
 ### 8.1 Zweck
 
-Bildauflistung für Galerien.
+Auflistung aller verfügbaren Galerien.
 
 ### 8.2 Felder pro Eintrag
+
+| Feld        | Typ      | Pflicht  | Beschreibung                                                                                                                                                                      |
+|-------------|----------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `name`      | `string` | Ja       | Anzuzeigender Name der Galerie im Frontend.                                                                                                                                       |
+| `publishAt` | `string` | Optional | Start Sichtbarkeit (`JJJJ-MM-TT-HH:mm`).                                                                                                                                          |
+| `deleteAt`  | `string` | Ja       | Ende Sichtbarkeit (`JJJJ-MM-TT-HH:mm`).                                                                                                                                           |
+| `directory` | `string` | Ja       | Ordnername für die index.html und für die Bilder. Am Besten gibt es hier eine auswahlliste, die alle Ordner unter `/galerie/` liegen. Es ist aber auch jeder andere Text erlaubt. |
+
+
+### 8.3 Vorlage
+
+```json
+[
+  {
+    "name": "Fasching 2026",
+    "publishAt": "2026-05-04-10:00",
+    "deleteAt": "2028-05-05-10:00",
+    "directory": "fasching26"
+  }
+]
+```
+
+---
+
+## 9) Datei: `gallerys/{xyz}.json`
+
+Pfad: `src/data/gallerys/{xyz}.json`
+
+### 9.1 Zweck
+
+Bildauflistung für Galerien.
+
+### 9.2 Felder pro Eintrag
 
 | Feld  | Typ      | Pflicht  | Beschreibung                                      |
 |-------|----------|----------|---------------------------------------------------|
 | `src` | `string` | Ja       | Bildpfad. `./src/img/{xyz}/{dateiname}`           |
 | `alt` | `string` | Optional | Alt-Text (Fallback: `Bild aus der Home-Gallery`). |
 
-### 8.3 Vorlage
+### 9.3 Vorlage
 
 ```json
 [
@@ -394,17 +427,115 @@ Bildauflistung für Galerien.
 ]
 ```
 
+### 9.4 Erweiterte Funktionen im Galeriebereich
+
+#### 9.4.1 Hinzufügen neuer Galerien
+
+Es soll die Möglichkeit geben eine komplett neue Galerie (beispielsweise für ein vergangenes Event) anzulegen. Folgende
+Informationen werden hierzu benötigt:
+
+| Information      | Typ      | Pflicht | Beschreibung                         |
+|------------------|----------|---------|--------------------------------------|
+| Technischer Name | `string` | Ja      | Text für Dateinamen und Directorys   |
+| Leserlicher Name | `string` | Ja      | Name, der im Frontend angezeigt wird | 
+
+##### 9.4 1.1 Folgender Prozess muss durchlaufen werden:
+
+1. Eingabe aller Pflichtinformationen
+2. Generierung folgender Dateien und Ordner:
+    + Ordner /galerie/<technischerName>
+    + Datei /galerie/<technischerName>/index.html
+    + Datei /src/data/gallerys/<technischerName>.json
+    + Ordner /src/img/gallerys/<technischerName>
+3. Preview der generierten Dateien
+4. Möglichkeit zum Git Commit
+
+##### 9.4.1.2 Templates für die zu generierenden Dateien
+
+`/galerie/<technischerName>/index.html`
+
+```html
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>SKV | [LeserlicherName]</title>
+    <meta name="description" content="Bildergalerie des Sandersdorfer Karnevalsverein e.V."/>
+    <meta name="gallery-source" content="../../src/data/gallerys/[TechnischerName].json"/>
+    <link rel="stylesheet" href="../../src/css/style.css"/>
+    <link rel="stylesheet" href="../../src/css/gallery-detail.css"/>
+    <link rel="icon" href="../../src/img/logo.png"/>
+</head>
+<body data-page="legal">
+<div id="header-component"></div>
+
+<main class="section legal-page">
+    <section class="container legal-card">
+        <h1>[LeserlicherName]</h1>
+        <div id="gallery-grid" class="grid cards-3 gallery-grid" aria-live="polite"></div>
+    </section>
+</main>
+
+<div id="footer-component"></div>
+
+<div id="gallery-lightbox" class="gallery-lightbox" aria-hidden="true">
+    <button type="button" class="gallery-lightbox-backdrop" id="gallery-lightbox-backdrop"
+            aria-label="Vorschau schließen"></button>
+    <div class="gallery-lightbox-dialog" role="dialog" aria-modal="true" aria-label="Bildvorschau">
+        <div class="gallery-lightbox-frame">
+            <img id="gallery-lightbox-image" class="gallery-lightbox-image" src="" alt=""/>
+            <p id="gallery-lightbox-caption" class="gallery-lightbox-caption"></p>
+        </div>
+        <div class="gallery-lightbox-controls">
+            <button type="button" class="gallery-lightbox-nav" id="gallery-lightbox-prev" aria-label="Vorheriges Bild">
+                ◀
+            </button>
+            <button type="button" class="gallery-lightbox-close" id="gallery-lightbox-close"
+                    aria-label="Vorschau schließen">Schließen
+            </button>
+            <button type="button" class="gallery-lightbox-nav" id="gallery-lightbox-next" aria-label="Nächstes Bild">▶
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="../../src/js/gallery-detail.js"></script>
+<script src="../../src/js/script.js"></script>
+</body>
+</html>
+```
+
+`/src/data/gallerys/<technischerName>.json`
+
+```json
+[]
+```
+
+#### 9.4.2 Löschen von Galerien
+
+Folgender Prozess ist zu durchlaufen:
+
+1. Eingabe des technischen Namens der Galerie
+2. Löschung folgender Dateien und Ordner:
+    + Ordner /galerie/<technischerName>
+    + Datei /galerie/<technischerName>/index.html
+    + Datei /src/data/gallerys/<technischerName>.json
+    + Ordner /src/img/gallerys/<technischerName> (Inklusive aller Dateien, die im Ordner liegen)
+3. Preview aller zu löschenden Dateien
+4. Möglichkeit zum Git Commit. NAch erfolgreichem Git Commit soll noch folgender Hinweis angezeigt werden: `Bitte kontrollieren sie, dass die eben gelöscht Galerie "<technischerName>" nicht mehr in der gallery-overview angegeben ist.`
+
 ---
 
-## 9) Datei: `header-notices.json`
+## 10) Datei: `header-notices.json`
 
 Pfad: `./src/data/header-notices.json`
 
-### 9.1 Zweck
+### 10.1 Zweck
 
 Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder Seite).
 
-### 9.2 Felder pro Eintrag
+### 10.2 Felder pro Eintrag
 
 | Feld        | Typ      | Pflicht                                                                 | Beschreibung                                                               |
 |-------------|----------|-------------------------------------------------------------------------|----------------------------------------------------------------------------|
@@ -413,7 +544,7 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 | `publishAt` | `string` | Optional                                                                | Start Sichtbarkeit (`JJJJ-MM-TT-HH:mm`).                                   |
 | `deleteAt`  | `string` | Wenn `countdown`, dann das Datum vom Countdown, sonst trotzdem Pflicht. | Ende Sichtbarkeit (`JJJJ-MM-TT-HH:mm`).                                    |
 
-### 9.3 Countdown-Regeln
+### 10.3 Countdown-Regeln
 
 - Wenn Restzeit **>= 1 Tag**: Anzeige in `Tage`, `Stunden`, `Minuten`
 - Wenn Restzeit **< 1 Tag**: Anzeige in `Stunden`, `Minuten`, `Sekunden`
@@ -421,7 +552,7 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 - Läuft der Countdown ab, wird der komplette Hinweis sofort entfernt.
 - Hinweise im Band werden visuell durch `+++` getrennt.
 
-### 9.4 Vorlage
+### 10.4 Vorlage
 
 ```json
 [
@@ -436,15 +567,15 @@ Wichtige Hinweise für das **rote Hinweisband im Header** (ganz oben auf jeder S
 
 ---
 
-# 10) Datei: `downloads.json`
+# 11) Datei: `downloads.json`
 
 Pfad: `./src/data/downloads.json`
 
-## 10.1 Zweck
+## 11.1 Zweck
 
 Alle Dateidownloads, die auf der Downloadseite angezeigt werden.
 
-## 10.2 Felder pro Eintrag
+## 11.2 Felder pro Eintrag
 
 | Feld          | Typ      | Pflicht   | Beschreibung                             |
 |---------------|----------|-----------|------------------------------------------|
@@ -453,7 +584,7 @@ Alle Dateidownloads, die auf der Downloadseite angezeigt werden.
 | `file`        | `string` | Ja        | Dateipfad. `./src/downloads/{dateiname}` |
 | `label`       | `string` | Ja        | Buttontext                               |
 
-##10.3 Vorlage
+## 11.3 Vorlage
 
 ```json
 [
@@ -468,7 +599,7 @@ Alle Dateidownloads, die auf der Downloadseite angezeigt werden.
 
 ---
 
-## 11) Checkliste vor dem Speichern
+## 12) Checkliste vor dem Speichern
 
 1. JSON ist syntaktisch valide.
 2. Top-Level ist ein Array.
@@ -480,7 +611,7 @@ Alle Dateidownloads, die auf der Downloadseite angezeigt werden.
 
 ---
 
-## 12) Minimale Komplettbeispiele (alle Dateien)
+## 13) Minimale Komplettbeispiele (alle Dateien)
 
 ### `news.json`
 
