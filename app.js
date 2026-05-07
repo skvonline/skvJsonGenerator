@@ -307,6 +307,12 @@ const galleryCreatePreviewJson = document.querySelector("#galleryCreatePreviewJs
 const galleryCreatePreviewBtn = document.querySelector("#galleryCreatePreviewBtn");
 const galleryCreateCommitBtn = document.querySelector("#galleryCreateCommitBtn");
 const galleryCreateCancelBtn = document.querySelector("#galleryCreateCancelBtn");
+const galleryDeleteScaffoldDialog = document.querySelector("#galleryDeleteScaffoldDialog");
+const galleryDeleteTechName = document.querySelector("#galleryDeleteTechName");
+const galleryDeletePreviewPaths = document.querySelector("#galleryDeletePreviewPaths");
+const galleryDeletePreviewBtn = document.querySelector("#galleryDeletePreviewBtn");
+const galleryDeleteCommitBtn = document.querySelector("#galleryDeleteCommitBtn");
+const galleryDeleteCancelBtn = document.querySelector("#galleryDeleteCancelBtn");
 const DEFAULT_GALLERY_NAME = "home-gallery";
 const MANAGED_FILE_TYPES = new Set(["vorstand", "elferrat", "royals", "downloads"]);
 let confirmedGalleryName = "";
@@ -417,6 +423,9 @@ function toCurrencyInputValue(value) {
 
 function updateTypeDependentUi() {
   galleryNameWrap.classList.toggle("hidden", typeSelect.value !== "gallery");
+  const showGalleryOverviewActions = typeSelect.value === "gallery-overview";
+  createGalleryScaffoldBtn?.classList.toggle("hidden", !showGalleryOverviewActions);
+  deleteGalleryScaffoldBtn?.classList.toggle("hidden", !showGalleryOverviewActions);
   updateGalleryConfirmationState();
 }
 
@@ -2474,6 +2483,67 @@ function buildGalleryCreateArtifacts(technicalName, readableName) {
   };
 }
 
+
+async function fetchRepoFilesForPrefix(prefix, branch) {
+  const owner = CONFIG.GITHUB_OWNER;
+  const repo = CONFIG.GITHUB_REPO;
+  const headSha = await getBranchHeadSha({ owner, repo, branch, token: null });
+  if (!headSha) return [];
+  const commitResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits/${headSha}`, { headers: { Accept: "application/vnd.github+json" } });
+  if (!commitResp.ok) return [];
+  const commitPayload = await commitResp.json();
+  const treeSha = commitPayload?.tree?.sha;
+  if (!treeSha) return [];
+  const treeResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`, { headers: { Accept: "application/vnd.github+json" } });
+  if (!treeResp.ok) return [];
+  const treePayload = await treeResp.json();
+  const all = Array.isArray(treePayload?.tree) ? treePayload.tree : [];
+  return all.filter((item) => item?.type === "blob" && typeof item?.path === "string" && item.path.startsWith(prefix)).map((item) => item.path);
+}
+
+async function buildGalleryDeleteArtifacts(technicalName) {
+  const branch = getTargetBranch();
+  const files = new Set([
+    `src/data/gallerys/${technicalName}.json`,
+    `galerie/${technicalName}/index.html`
+  ]);
+  const galerieFiles = await fetchRepoFilesForPrefix(`galerie/${technicalName}/`, branch);
+  const imageFiles = await fetchRepoFilesForPrefix(`src/img/gallerys/${technicalName}/`, branch);
+  galerieFiles.forEach((f) => files.add(f));
+  imageFiles.forEach((f) => files.add(f));
+  const sorted = [...files].sort((a,b)=>a.localeCompare(b,"de"));
+  return {
+    technicalName,
+    previewPaths: [`galerie/${technicalName}/`, ...sorted, `src/img/gallerys/${technicalName}/**`],
+    files: sorted.map((path) => ({ path, delete: true }))
+  };
+}
+
+function openGalleryDeleteDialog() {
+  if (!galleryDeleteScaffoldDialog || typeof galleryDeleteScaffoldDialog.showModal !== "function") return;
+  galleryDeleteTechName.value = "";
+  galleryDeletePreviewPaths.textContent = "";
+  galleryDeleteScaffoldDialog.showModal();
+}
+
+async function commitGalleryDeleteDirect() {
+  const technicalName = sanitizeGalleryTechnicalName(galleryDeleteTechName?.value);
+  if (!technicalName) return window.alert("Bitte technischen Namen eingeben.");
+  const artifacts = await buildGalleryDeleteArtifacts(technicalName);
+  galleryDeletePreviewPaths.textContent = artifacts.previewPaths.join("\n");
+  const commitInput = await openCommitDialog(`Delete gallery scaffold for ${technicalName}`);
+  if (!commitInput) return;
+  const owner = CONFIG.GITHUB_OWNER; const repo = CONFIG.GITHUB_REPO; const branch = getTargetBranch();
+  galleryDeleteCommitBtn.disabled = true;
+  try {
+    await ensureBranchExists({ owner, repo, branch, token: commitInput.token });
+    const commitSha = await createSingleGitHubCommit({ owner, repo, branch, token: commitInput.token, message: commitInput.commitMessage, files: artifacts.files });
+    setCommitStatus(`Galerie gelöscht: <a href="https://github.com/${owner}/${repo}/commit/${commitSha}" target="_blank">Commit öffnen</a><br>Bitte kontrollieren sie, dass die eben gelöscht Galerie "${technicalName}" nicht mehr in der gallery-overview angegeben ist.`, "success");
+    if (galleryDeleteScaffoldDialog?.open) galleryDeleteScaffoldDialog.close();
+  } catch (error) {
+    setCommitStatus(`Galerie-Löschung fehlgeschlagen: ${error.message}`, "error");
+  } finally { galleryDeleteCommitBtn.disabled = false; }
+}
 function updateCompareLink() {
   if (!compareLink) return;
   const targetBranch = getTargetBranch();
@@ -2606,7 +2676,7 @@ async function githubApiRequest(url, { token, method = "GET", body } = {}) {
     method,
     headers: {
       Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(body ? { "Content-Type": "application/json" } : {})
     },
     ...(body ? { body: JSON.stringify(body) } : {})
@@ -2724,7 +2794,7 @@ async function getRepositoryDefaultBranch({ owner, repo, token }) {
   const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
     headers: {
       Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
     }
   });
 
@@ -2741,7 +2811,7 @@ async function getBranchHeadSha({ owner, repo, branch, token }) {
   const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, {
     headers: {
       Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
     }
   });
 
@@ -2766,7 +2836,7 @@ async function createBranchFromDefault({ owner, repo, branch, token }) {
     method: "POST",
     headers: {
       Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -3158,7 +3228,7 @@ createGalleryScaffoldBtn?.addEventListener("click", () => {
   openGalleryCreateDialog();
 });
 deleteGalleryScaffoldBtn?.addEventListener("click", () => {
-  window.alert("Löschen folgt im nächsten Schritt (9.4.2).");
+  openGalleryDeleteDialog();
 });
 galleryCreatePreviewBtn?.addEventListener("click", () => {
   const technicalName = sanitizeGalleryTechnicalName(galleryCreateTechName?.value);
@@ -3174,6 +3244,14 @@ galleryCreatePreviewBtn?.addEventListener("click", () => {
 });
 galleryCreateCommitBtn?.addEventListener("click", commitGalleryCreateDirect);
 galleryCreateCancelBtn?.addEventListener("click", () => { if (galleryCreateDialog?.open) galleryCreateDialog.close(); });
+galleryDeletePreviewBtn?.addEventListener("click", async () => {
+  const technicalName = sanitizeGalleryTechnicalName(galleryDeleteTechName?.value);
+  if (!technicalName) return window.alert("Bitte technischen Namen eingeben.");
+  const artifacts = await buildGalleryDeleteArtifacts(technicalName);
+  galleryDeletePreviewPaths.textContent = artifacts.previewPaths.join("\n");
+});
+galleryDeleteCommitBtn?.addEventListener("click", commitGalleryDeleteDirect);
+galleryDeleteCancelBtn?.addEventListener("click", () => { if (galleryDeleteScaffoldDialog?.open) galleryDeleteScaffoldDialog.close(); });
 generateBtn.addEventListener("click", validateAndGenerate);
 loadOnlineBtn.addEventListener("click", loadOnlineJson);
 syncBranchesBtn?.addEventListener("click", syncBranches);

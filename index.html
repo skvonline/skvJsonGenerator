@@ -213,6 +213,22 @@
       </form>
     </dialog>
 
+
+    <dialog id="galleryDeleteScaffoldDialog" class="confirm-dialog">
+      <form id="galleryDeleteScaffoldForm" method="dialog" class="confirm-dialog-form">
+        <h2>Galerie löschen</h2>
+        <label for="galleryDeleteTechName">Technischer Name</label>
+        <input id="galleryDeleteTechName" type="text" placeholder="z. B. fasching26" required />
+        <p><strong>Vorschau zu löschende Dateien</strong></p>
+        <pre id="galleryDeletePreviewPaths"></pre>
+        <div class="actions">
+          <button id="galleryDeletePreviewBtn" type="button">Vorschau aktualisieren</button>
+          <button id="galleryDeleteCommitBtn" type="button">Direkt committen</button>
+          <button id="galleryDeleteCancelBtn" type="button" class="secondary-button">Schließen</button>
+        </div>
+      </form>
+    </dialog>
+
     <script src="app.js"></script>
   </body>
 </html>
