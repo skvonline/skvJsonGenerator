@@ -313,6 +313,7 @@ const pendingEntryImageRepoDeletes = new Set();
 const detachedEntryImageUploads = new Set();
 let onlineJsonLoaded = false;
 let pendingGalleryScaffoldFiles = [];
+let galleryDirectorySuggestions = [];
 
 function getSourceBranch() {
   const value = sourceBranchSelect?.value?.trim();
@@ -1183,6 +1184,54 @@ async function startManagedFileReplacement(entryEl) {
   resetValidationUi();
 }
 
+
+async function fetchGalleryDirectories() {
+  const owner = CONFIG.GITHUB_OWNER;
+  const repo = CONFIG.GITHUB_REPO;
+  const branch = getSourceBranch();
+  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/galerie?ref=${encodeURIComponent(branch)}`;
+  const response = await fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } });
+  if (!response.ok) throw new Error(`Galerie-Ordner konnten nicht geladen werden (HTTP ${response.status}).`);
+  const payload = await response.json();
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .filter((item) => item?.type === "dir" && typeof item?.name === "string")
+    .map((item) => item.name)
+    .sort((a, b) => a.localeCompare(b, "de"));
+}
+
+function ensureGalleryDirectoryDatalist() {
+  let datalist = document.querySelector('#galleryDirectorySuggestions');
+  if (!datalist) {
+    datalist = document.createElement('datalist');
+    datalist.id = 'galleryDirectorySuggestions';
+    document.body.append(datalist);
+  }
+  datalist.innerHTML = '';
+  galleryDirectorySuggestions.forEach((name) => {
+    const option = document.createElement('option');
+    option.value = name;
+    datalist.append(option);
+  });
+}
+
+function applyGalleryDirectorySuggestionsToInputs() {
+  if (typeSelect.value !== 'gallery-overview') return;
+  ensureGalleryDirectoryDatalist();
+  entriesEl.querySelectorAll('input[data-field="directory"]').forEach((input) => {
+    input.setAttribute('list', 'galleryDirectorySuggestions');
+  });
+}
+
+async function refreshGalleryDirectorySuggestions() {
+  if (typeSelect.value !== 'gallery-overview') return;
+  try {
+    galleryDirectorySuggestions = await fetchGalleryDirectories();
+    applyGalleryDirectorySuggestionsToInputs();
+  } catch (error) {
+    galleryDirectorySuggestions = [];
+  }
+}
 function createInput(field, value) {
   const wrapper = document.createElement("div");
   wrapper.className = "form-field";
@@ -1230,6 +1279,10 @@ function createInput(field, value) {
   }
 
   if (field.placeholder) input.placeholder = field.placeholder;
+  if (typeSelect.value === "gallery-overview" && field.name === "directory" && input.tagName === "INPUT") {
+    ensureGalleryDirectoryDatalist();
+    input.setAttribute("list", "galleryDirectorySuggestions");
+  }
   input.dataset.field = field.name;
   input.dataset.fieldType = field.type;
   input.dataset.required = String(!!field.required);
@@ -2444,6 +2497,7 @@ async function syncBranches() {
     }
     updateCompareLink();
     updateCommitBranchLabel();
+    refreshGalleryDirectorySuggestions();
     syncBranchesBtn.textContent = "✓";
   } catch (error) {
     syncBranchesBtn.textContent = "!";
@@ -2935,6 +2989,7 @@ typeSelect.addEventListener("change", () => {
   pendingGalleryScaffoldFiles = [];
   updateTypeDependentUi();
   renderEntries(typeSelect.value);
+  refreshGalleryDirectorySuggestions();
 });
 
 addEntryBtn.addEventListener("click", async () => {
@@ -3038,6 +3093,7 @@ confirmGalleryBtn.addEventListener("click", confirmGalleryName);
 
 sourceBranchSelect?.addEventListener("change", () => {
   setOnlineJsonLoaded(false);
+  refreshGalleryDirectorySuggestions();
 });
 
 targetBranchInput?.addEventListener("input", () => {
@@ -3187,3 +3243,4 @@ updateCommitBranchLabel();
 syncBranches();
 updateTypeDependentUi();
 renderEntries("news");
+refreshGalleryDirectorySuggestions();
