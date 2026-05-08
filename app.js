@@ -216,6 +216,22 @@ const specs = {
       deleteAt: "2026-05-09-16:30"
     }
   },
+  "gallery-overview": {
+    filename: "gallery-overview.json",
+    summaryKeys: ["name", "directory"],
+    fields: [
+      { name: "name", type: "text", required: true },
+      { name: "publishAt", type: "datetime", placeholder: "JJJJ-MM-TT-HH:mm" },
+      { name: "deleteAt", type: "datetime", required: true, placeholder: "JJJJ-MM-TT-HH:mm" },
+      { name: "directory", type: "text", required: true }
+    ],
+    template: {
+      name: "Fasching 2026",
+      publishAt: "2026-05-04-10:00",
+      deleteAt: "2028-05-05-10:00",
+      directory: "fasching26"
+    }
+  },
   gallery: {
     filename: "gallerys/{xyz}.json",
     summaryKeys: ["src", "alt"],
@@ -282,6 +298,21 @@ const galleryInternalImagePreview = document.querySelector("#galleryInternalImag
 const confirmGalleryInternalImageBtn = document.querySelector("#confirmGalleryInternalImageBtn");
 const cancelGalleryInternalImageBtn = document.querySelector("#cancelGalleryInternalImageBtn");
 const scrollTopBtn = document.querySelector("#scrollTopBtn");
+const galleryCreateDialog = document.querySelector("#galleryCreateDialog");
+const galleryCreateTechName = document.querySelector("#galleryCreateTechName");
+const galleryCreateDisplayName = document.querySelector("#galleryCreateDisplayName");
+const galleryCreatePreviewPaths = document.querySelector("#galleryCreatePreviewPaths");
+const galleryCreatePreviewHtml = document.querySelector("#galleryCreatePreviewHtml");
+const galleryCreatePreviewJson = document.querySelector("#galleryCreatePreviewJson");
+const galleryCreatePreviewBtn = document.querySelector("#galleryCreatePreviewBtn");
+const galleryCreateCommitBtn = document.querySelector("#galleryCreateCommitBtn");
+const galleryCreateCancelBtn = document.querySelector("#galleryCreateCancelBtn");
+const galleryDeleteScaffoldDialog = document.querySelector("#galleryDeleteScaffoldDialog");
+const galleryDeleteTechName = document.querySelector("#galleryDeleteTechName");
+const galleryDeletePreviewPaths = document.querySelector("#galleryDeletePreviewPaths");
+const galleryDeletePreviewBtn = document.querySelector("#galleryDeletePreviewBtn");
+const galleryDeleteCommitBtn = document.querySelector("#galleryDeleteCommitBtn");
+const galleryDeleteCancelBtn = document.querySelector("#galleryDeleteCancelBtn");
 const DEFAULT_GALLERY_NAME = "home-gallery";
 const MANAGED_FILE_TYPES = new Set(["vorstand", "elferrat", "royals", "downloads"]);
 let confirmedGalleryName = "";
@@ -296,6 +327,8 @@ const selectedEntryImageFiles = new Map();
 const pendingEntryImageRepoDeletes = new Set();
 const detachedEntryImageUploads = new Set();
 let onlineJsonLoaded = false;
+let pendingGalleryScaffoldFiles = [];
+let galleryDirectorySuggestions = [];
 
 function getSourceBranch() {
   const value = sourceBranchSelect?.value?.trim();
@@ -390,6 +423,9 @@ function toCurrencyInputValue(value) {
 
 function updateTypeDependentUi() {
   galleryNameWrap.classList.toggle("hidden", typeSelect.value !== "gallery");
+  const showGalleryOverviewActions = typeSelect.value === "gallery-overview";
+  createGalleryScaffoldBtn?.classList.toggle("hidden", !showGalleryOverviewActions);
+  deleteGalleryScaffoldBtn?.classList.toggle("hidden", !showGalleryOverviewActions);
   updateGalleryConfirmationState();
 }
 
@@ -1166,6 +1202,54 @@ async function startManagedFileReplacement(entryEl) {
   resetValidationUi();
 }
 
+
+async function fetchGalleryDirectories() {
+  const owner = CONFIG.GITHUB_OWNER;
+  const repo = CONFIG.GITHUB_REPO;
+  const branch = getSourceBranch();
+  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/galerie?ref=${encodeURIComponent(branch)}`;
+  const response = await fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } });
+  if (!response.ok) throw new Error(`Galerie-Ordner konnten nicht geladen werden (HTTP ${response.status}).`);
+  const payload = await response.json();
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .filter((item) => item?.type === "dir" && typeof item?.name === "string")
+    .map((item) => item.name)
+    .sort((a, b) => a.localeCompare(b, "de"));
+}
+
+function ensureGalleryDirectoryDatalist() {
+  let datalist = document.querySelector('#galleryDirectorySuggestions');
+  if (!datalist) {
+    datalist = document.createElement('datalist');
+    datalist.id = 'galleryDirectorySuggestions';
+    document.body.append(datalist);
+  }
+  datalist.innerHTML = '';
+  galleryDirectorySuggestions.forEach((name) => {
+    const option = document.createElement('option');
+    option.value = name;
+    datalist.append(option);
+  });
+}
+
+function applyGalleryDirectorySuggestionsToInputs() {
+  if (typeSelect.value !== 'gallery-overview') return;
+  ensureGalleryDirectoryDatalist();
+  entriesEl.querySelectorAll('input[data-field="directory"]').forEach((input) => {
+    input.setAttribute('list', 'galleryDirectorySuggestions');
+  });
+}
+
+async function refreshGalleryDirectorySuggestions() {
+  if (typeSelect.value !== 'gallery-overview') return;
+  try {
+    galleryDirectorySuggestions = await fetchGalleryDirectories();
+    applyGalleryDirectorySuggestionsToInputs();
+  } catch (error) {
+    galleryDirectorySuggestions = [];
+  }
+}
 function createInput(field, value) {
   const wrapper = document.createElement("div");
   wrapper.className = "form-field";
@@ -1213,6 +1297,10 @@ function createInput(field, value) {
   }
 
   if (field.placeholder) input.placeholder = field.placeholder;
+  if (typeSelect.value === "gallery-overview" && field.name === "directory" && input.tagName === "INPUT") {
+    ensureGalleryDirectoryDatalist();
+    input.setAttribute("list", "galleryDirectorySuggestions");
+  }
   input.dataset.field = field.name;
   input.dataset.fieldType = field.type;
   input.dataset.required = String(!!field.required);
@@ -2326,10 +2414,140 @@ function getFetchUrl() {
   return `${base}/src/data/${specs[typeSelect.value].filename}`;
 }
 
+
+
+function sanitizeGalleryTechnicalName(raw) {
+  return String(raw || "").trim().toLowerCase().replace(/[^a-z0-9-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
+
+function buildGalleryCreateArtifacts(technicalName, readableName) {
+  const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>SKV | ${readableName}</title>
+    <meta name="description" content="Bildergalerie des Sandersdorfer Karnevalsverein e.V."/>
+    <meta name="gallery-source" content="../../src/data/gallerys/${technicalName}.json"/>
+    <link rel="stylesheet" href="../../src/css/style.css"/>
+    <link rel="stylesheet" href="../../src/css/gallery-detail.css"/>
+    <link rel="icon" href="../../src/img/logo.png"/>
+</head>
+<body data-page="legal">
+<div id="header-component"></div>
+
+<main class="section legal-page">
+    <section class="container legal-card">
+        <h1>${readableName}</h1>
+        <div id="gallery-grid" class="grid cards-3 gallery-grid" aria-live="polite"></div>
+    </section>
+</main>
+
+<div id="footer-component"></div>
+
+<div id="gallery-lightbox" class="gallery-lightbox" aria-hidden="true">
+    <button type="button" class="gallery-lightbox-backdrop" id="gallery-lightbox-backdrop" aria-label="Vorschau schließen"></button>
+    <div class="gallery-lightbox-dialog" role="dialog" aria-modal="true" aria-label="Bildvorschau">
+        <div class="gallery-lightbox-frame">
+            <img id="gallery-lightbox-image" class="gallery-lightbox-image" src="" alt=""/>
+            <p id="gallery-lightbox-caption" class="gallery-lightbox-caption"></p>
+        </div>
+        <div class="gallery-lightbox-controls">
+            <button type="button" class="gallery-lightbox-nav" id="gallery-lightbox-prev" aria-label="Vorheriges Bild">◀</button>
+            <button type="button" class="gallery-lightbox-close" id="gallery-lightbox-close" aria-label="Vorschau schließen">Schließen</button>
+            <button type="button" class="gallery-lightbox-nav" id="gallery-lightbox-next" aria-label="Nächstes Bild">▶</button>
+        </div>
+    </div>
+</div>
+
+<script src="../../src/js/gallery-detail.js"></script>
+<script src="../../src/js/script.js"></script>
+</body>
+</html>
+`;
+  return {
+    technicalName,
+    readableName,
+    files: [
+      { path: `galerie/${technicalName}/index.html`, contentBase64: toBase64Utf8(html) },
+      { path: `src/data/gallerys/${technicalName}.json`, contentBase64: toBase64Utf8("[]\n") }
+    ],
+    previewPaths: [
+      `galerie/${technicalName}/`,
+      `galerie/${technicalName}/index.html`,
+      `src/data/gallerys/${technicalName}.json`,
+      `src/img/gallerys/${technicalName}/`
+    ],
+    html,
+    json: "[]"
+  };
+}
+
+
+async function fetchRepoFilesForPrefix(prefix, branch) {
+  const owner = CONFIG.GITHUB_OWNER;
+  const repo = CONFIG.GITHUB_REPO;
+  const headSha = await getBranchHeadSha({ owner, repo, branch, token: null });
+  if (!headSha) return [];
+  const commitResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits/${headSha}`, { headers: { Accept: "application/vnd.github+json" } });
+  if (!commitResp.ok) return [];
+  const commitPayload = await commitResp.json();
+  const treeSha = commitPayload?.tree?.sha;
+  if (!treeSha) return [];
+  const treeResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`, { headers: { Accept: "application/vnd.github+json" } });
+  if (!treeResp.ok) return [];
+  const treePayload = await treeResp.json();
+  const all = Array.isArray(treePayload?.tree) ? treePayload.tree : [];
+  return all.filter((item) => item?.type === "blob" && typeof item?.path === "string" && item.path.startsWith(prefix)).map((item) => item.path);
+}
+
+async function buildGalleryDeleteArtifacts(technicalName) {
+  const branch = getTargetBranch();
+  const files = new Set([
+    `src/data/gallerys/${technicalName}.json`,
+    `galerie/${technicalName}/index.html`
+  ]);
+  const galerieFiles = await fetchRepoFilesForPrefix(`galerie/${technicalName}/`, branch);
+  const imageFiles = await fetchRepoFilesForPrefix(`src/img/gallerys/${technicalName}/`, branch);
+  galerieFiles.forEach((f) => files.add(f));
+  imageFiles.forEach((f) => files.add(f));
+  const sorted = [...files].sort((a,b)=>a.localeCompare(b,"de"));
+  return {
+    technicalName,
+    previewPaths: [`galerie/${technicalName}/`, ...sorted, `src/img/gallerys/${technicalName}/**`],
+    files: sorted.map((path) => ({ path, delete: true }))
+  };
+}
+
+function openGalleryDeleteDialog() {
+  if (!galleryDeleteScaffoldDialog || typeof galleryDeleteScaffoldDialog.showModal !== "function") return;
+  galleryDeleteTechName.value = "";
+  galleryDeletePreviewPaths.textContent = "";
+  galleryDeleteScaffoldDialog.showModal();
+}
+
+async function commitGalleryDeleteDirect() {
+  const technicalName = sanitizeGalleryTechnicalName(galleryDeleteTechName?.value);
+  if (!technicalName) return window.alert("Bitte technischen Namen eingeben.");
+  const artifacts = await buildGalleryDeleteArtifacts(technicalName);
+  galleryDeletePreviewPaths.textContent = artifacts.previewPaths.join("\n");
+  const commitInput = await openCommitDialog(`Delete gallery scaffold for ${technicalName}`);
+  if (!commitInput) return;
+  const owner = CONFIG.GITHUB_OWNER; const repo = CONFIG.GITHUB_REPO; const branch = getTargetBranch();
+  galleryDeleteCommitBtn.disabled = true;
+  try {
+    await ensureBranchExists({ owner, repo, branch, token: commitInput.token, baseBranch: getSourceBranch() });
+    const commitSha = await createSingleGitHubCommit({ owner, repo, branch, token: commitInput.token, message: commitInput.commitMessage, files: artifacts.files });
+    setCommitStatus(`Galerie gelöscht: <a href="https://github.com/${owner}/${repo}/compare/${encodeURIComponent(getSourceBranch())}...${encodeURIComponent(branch)}" target="_blank">Changes ansehen</a><br>Bitte kontrollieren sie, dass die eben gelöscht Galerie "${technicalName}" nicht mehr in der gallery-overview angegeben ist.`, "success");
+    if (galleryDeleteScaffoldDialog?.open) galleryDeleteScaffoldDialog.close();
+  } catch (error) {
+    setCommitStatus(`Galerie-Löschung fehlgeschlagen: ${error.message}`, "error");
+  } finally { galleryDeleteCommitBtn.disabled = false; }
+}
 function updateCompareLink() {
   if (!compareLink) return;
   const targetBranch = getTargetBranch();
-  compareLink.href = `https://github.com/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/compare/main...${encodeURIComponent(targetBranch)}`;
+  compareLink.href = `https://github.com/${CONFIG.GITHUB_OWNER}/${CONFIG.GITHUB_REPO}/compare/${encodeURIComponent(getSourceBranch())}...${encodeURIComponent(targetBranch)}`;
 }
 
 function updateCommitBranchLabel() {
@@ -2382,6 +2600,7 @@ async function syncBranches() {
     }
     updateCompareLink();
     updateCommitBranchLabel();
+    refreshGalleryDirectorySuggestions();
     syncBranchesBtn.textContent = "✓";
   } catch (error) {
     syncBranchesBtn.textContent = "!";
@@ -2457,7 +2676,7 @@ async function githubApiRequest(url, { token, method = "GET", body } = {}) {
     method,
     headers: {
       Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(body ? { "Content-Type": "application/json" } : {})
     },
     ...(body ? { body: JSON.stringify(body) } : {})
@@ -2575,7 +2794,7 @@ async function getRepositoryDefaultBranch({ owner, repo, token }) {
   const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
     headers: {
       Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
     }
   });
 
@@ -2592,7 +2811,7 @@ async function getBranchHeadSha({ owner, repo, branch, token }) {
   const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, {
     headers: {
       Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
     }
   });
 
@@ -2606,18 +2825,18 @@ async function getBranchHeadSha({ owner, repo, branch, token }) {
   return payload?.object?.sha || null;
 }
 
-async function createBranchFromDefault({ owner, repo, branch, token }) {
-  const defaultBranch = await getRepositoryDefaultBranch({ owner, repo, token });
-  const baseSha = await getBranchHeadSha({ owner, repo, branch: defaultBranch, token });
+async function createBranchFromDefault({ owner, repo, branch, token, baseBranch }) {
+  const sourceBranch = (baseBranch || getSourceBranch() || CONFIG.DEFAULT_SOURCE_BRANCH).trim();
+  const baseSha = await getBranchHeadSha({ owner, repo, branch: sourceBranch, token });
   if (!baseSha) {
-    throw new Error(`Default-Branch '${defaultBranch}' konnte nicht aufgelöst werden.`);
+    throw new Error(`Basis-Branch '${sourceBranch}' konnte nicht aufgelöst werden.`);
   }
 
   const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs`, {
     method: "POST",
     headers: {
       Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -2635,10 +2854,10 @@ async function createBranchFromDefault({ owner, repo, branch, token }) {
   }
 }
 
-async function ensureBranchExists({ owner, repo, branch, token }) {
+async function ensureBranchExists({ owner, repo, branch, token, baseBranch }) {
   const existingSha = await getBranchHeadSha({ owner, repo, branch, token });
   if (existingSha) return;
-  await createBranchFromDefault({ owner, repo, branch, token });
+  await createBranchFromDefault({ owner, repo, branch, token, baseBranch });
 }
 
 function openCommitDialog(defaultMessage) {
@@ -2682,6 +2901,53 @@ function openCommitDialog(defaultMessage) {
   });
 }
 
+
+async function commitGalleryCreateDirect() {
+  if (!galleryCreateTechName || !galleryCreateDisplayName) return;
+  const technicalName = sanitizeGalleryTechnicalName(galleryCreateTechName.value);
+  const readableName = galleryCreateDisplayName.value.trim();
+  if (!technicalName || !readableName) {
+    window.alert("Bitte technischen und leserlichen Namen eingeben.");
+    return;
+  }
+  const artifacts = buildGalleryCreateArtifacts(technicalName, readableName);
+  galleryCreatePreviewPaths.textContent = artifacts.previewPaths.join("\n");
+  galleryCreatePreviewHtml.textContent = artifacts.html;
+  galleryCreatePreviewJson.textContent = artifacts.json;
+
+  const commitInput = await openCommitDialog(`Create gallery scaffold for ${technicalName}`);
+  if (!commitInput) return;
+
+  const owner = CONFIG.GITHUB_OWNER;
+  const repo = CONFIG.GITHUB_REPO;
+  const branch = getTargetBranch();
+  galleryCreateCommitBtn.disabled = true;
+  setCommitStatus("Galerie-Commit wird vorbereitet...");
+  try {
+    await ensureBranchExists({ owner, repo, branch, token: commitInput.token, baseBranch: getSourceBranch() });
+    const commitSha = await createSingleGitHubCommit({
+      owner, repo, branch, token: commitInput.token,
+      message: commitInput.commitMessage,
+      files: artifacts.files
+    });
+    setCommitStatus(`Galerie erfolgreich erstellt: <a href="https://github.com/${owner}/${repo}/compare/${encodeURIComponent(getSourceBranch())}...${encodeURIComponent(branch)}" target="_blank">Changes ansehen</a>`, "success");
+    if (galleryCreateDialog?.open) galleryCreateDialog.close();
+  } catch (error) {
+    setCommitStatus(`Galerie-Commit fehlgeschlagen: ${error.message}`, "error");
+  } finally {
+    galleryCreateCommitBtn.disabled = false;
+  }
+}
+
+function openGalleryCreateDialog() {
+  if (!galleryCreateDialog || typeof galleryCreateDialog.showModal !== "function") return;
+  galleryCreateTechName.value = "";
+  galleryCreateDisplayName.value = "";
+  galleryCreatePreviewPaths.textContent = "";
+  galleryCreatePreviewHtml.textContent = "";
+  galleryCreatePreviewJson.textContent = "";
+  galleryCreateDialog.showModal();
+}
 async function commitGeneratedJson() {
   pruneUnusedSelectedGalleryFiles();
   pruneUnusedSelectedManagedFiles();
@@ -2711,11 +2977,12 @@ async function commitGeneratedJson() {
   setCommitStatus("Branch wird geprüft...");
 
   try {
-    await ensureBranchExists({ owner, repo, branch, token: commitInput.token });
+    await ensureBranchExists({ owner, repo, branch, token: commitInput.token, baseBranch: getSourceBranch() });
     setCommitStatus("Commit wird erstellt...");
     const normalizedJson = JSON.stringify(parsedJson, null, 2);
     const filesForCommit = [
-      { path, contentBase64: toBase64Utf8(`${normalizedJson}\n`) }
+      { path, contentBase64: toBase64Utf8(`${normalizedJson}\n`) },
+      ...pendingGalleryScaffoldFiles
     ];
 
     if (typeSelect.value === "gallery") {
@@ -2810,7 +3077,7 @@ async function commitGeneratedJson() {
 
     const commitUrl = commitSha ? `https://github.com/${owner}/${repo}/commit/${commitSha}` : "";
     const statusText = commitUrl
-      ? `Commit erfolgreich: <a href="https://github.com/${owner}/${repo}/compare/main...${encodeURIComponent(branch)}" target="_blank">${commitUrl}</a>`
+      ? `Commit erfolgreich: <a href="https://github.com/${owner}/${repo}/compare/${encodeURIComponent(getSourceBranch())}...${encodeURIComponent(branch)}" target="_blank">Changes ansehen</a>`
       : "Commit erfolgreich erstellt.";
     if (typeSelect.value === "gallery") pendingGalleryRepoDeletes.clear();
     if (typeSelect.value === "gallery") detachedGalleryUploads.clear();
@@ -2869,8 +3136,10 @@ typeSelect.addEventListener("change", () => {
   if (typeSelect.value === "gallery" && !galleryNameConfirmed) {
     galleryNameInput.value = DEFAULT_GALLERY_NAME;
   }
+  pendingGalleryScaffoldFiles = [];
   updateTypeDependentUi();
   renderEntries(typeSelect.value);
+  refreshGalleryDirectorySuggestions();
 });
 
 addEntryBtn.addEventListener("click", async () => {
@@ -2953,6 +3222,36 @@ addEntryBtn.addEventListener("click", async () => {
   }
 });
 
+const createGalleryScaffoldBtn = document.querySelector("#createGalleryScaffoldBtn");
+const deleteGalleryScaffoldBtn = document.querySelector("#deleteGalleryScaffoldBtn");
+createGalleryScaffoldBtn?.addEventListener("click", () => {
+  openGalleryCreateDialog();
+});
+deleteGalleryScaffoldBtn?.addEventListener("click", () => {
+  openGalleryDeleteDialog();
+});
+galleryCreatePreviewBtn?.addEventListener("click", () => {
+  const technicalName = sanitizeGalleryTechnicalName(galleryCreateTechName?.value);
+  const readableName = galleryCreateDisplayName?.value?.trim() || "";
+  if (!technicalName || !readableName) {
+    window.alert("Bitte technischen und leserlichen Namen eingeben.");
+    return;
+  }
+  const artifacts = buildGalleryCreateArtifacts(technicalName, readableName);
+  galleryCreatePreviewPaths.textContent = artifacts.previewPaths.join("\n");
+  galleryCreatePreviewHtml.textContent = artifacts.html;
+  galleryCreatePreviewJson.textContent = artifacts.json;
+});
+galleryCreateCommitBtn?.addEventListener("click", commitGalleryCreateDirect);
+galleryCreateCancelBtn?.addEventListener("click", () => { if (galleryCreateDialog?.open) galleryCreateDialog.close(); });
+galleryDeletePreviewBtn?.addEventListener("click", async () => {
+  const technicalName = sanitizeGalleryTechnicalName(galleryDeleteTechName?.value);
+  if (!technicalName) return window.alert("Bitte technischen Namen eingeben.");
+  const artifacts = await buildGalleryDeleteArtifacts(technicalName);
+  galleryDeletePreviewPaths.textContent = artifacts.previewPaths.join("\n");
+});
+galleryDeleteCommitBtn?.addEventListener("click", commitGalleryDeleteDirect);
+galleryDeleteCancelBtn?.addEventListener("click", () => { if (galleryDeleteScaffoldDialog?.open) galleryDeleteScaffoldDialog.close(); });
 generateBtn.addEventListener("click", validateAndGenerate);
 loadOnlineBtn.addEventListener("click", loadOnlineJson);
 syncBranchesBtn?.addEventListener("click", syncBranches);
@@ -2960,6 +3259,7 @@ confirmGalleryBtn.addEventListener("click", confirmGalleryName);
 
 sourceBranchSelect?.addEventListener("change", () => {
   setOnlineJsonLoaded(false);
+  refreshGalleryDirectorySuggestions();
 });
 
 targetBranchInput?.addEventListener("input", () => {
@@ -3109,3 +3409,4 @@ updateCommitBranchLabel();
 syncBranches();
 updateTypeDependentUi();
 renderEntries("news");
+refreshGalleryDirectorySuggestions();

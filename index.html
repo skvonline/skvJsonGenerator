@@ -73,6 +73,8 @@
         <div class="actions">
           <button id="addEntryBtn" type="button">Eintrag hinzufügen</button>
           <button id="generateBtn" type="button">Validieren</button>
+          <button id="createGalleryScaffoldBtn" type="button">Neue Galerie anlegen</button>
+          <button id="deleteGalleryScaffoldBtn" type="button">Galerie löschen</button>
         </div>
       </section>
 
@@ -185,6 +187,44 @@
         <div class="actions">
           <button id="confirmGalleryInternalImageBtn" type="button">Bild übernehmen</button>
           <button id="cancelGalleryInternalImageBtn" type="button" class="secondary-button">Abbrechen</button>
+        </div>
+      </form>
+    </dialog>
+
+
+    <dialog id="galleryCreateDialog" class="confirm-dialog">
+      <form id="galleryCreateForm" method="dialog" class="confirm-dialog-form">
+        <h2>Neue Galerie anlegen</h2>
+        <label for="galleryCreateTechName">Technischer Name</label>
+        <input id="galleryCreateTechName" type="text" placeholder="z. B. fasching26" required />
+        <label for="galleryCreateDisplayName">Leserlicher Name</label>
+        <input id="galleryCreateDisplayName" type="text" placeholder="z. B. Fasching 2026" required />
+        <p><strong>Vorschau Dateien</strong></p>
+        <pre id="galleryCreatePreviewPaths"></pre>
+        <p><strong>Vorschau index.html</strong></p>
+        <pre id="galleryCreatePreviewHtml"></pre>
+        <p><strong>Vorschau JSON</strong></p>
+        <pre id="galleryCreatePreviewJson"></pre>
+        <div class="actions">
+          <button id="galleryCreatePreviewBtn" type="button">Vorschau aktualisieren</button>
+          <button id="galleryCreateCommitBtn" type="button">Direkt committen</button>
+          <button id="galleryCreateCancelBtn" type="button" class="secondary-button">Schließen</button>
+        </div>
+      </form>
+    </dialog>
+
+
+    <dialog id="galleryDeleteScaffoldDialog" class="confirm-dialog">
+      <form id="galleryDeleteScaffoldForm" method="dialog" class="confirm-dialog-form">
+        <h2>Galerie löschen</h2>
+        <label for="galleryDeleteTechName">Technischer Name</label>
+        <input id="galleryDeleteTechName" type="text" placeholder="z. B. fasching26" required />
+        <p><strong>Vorschau zu löschende Dateien</strong></p>
+        <pre id="galleryDeletePreviewPaths"></pre>
+        <div class="actions">
+          <button id="galleryDeletePreviewBtn" type="button">Vorschau aktualisieren</button>
+          <button id="galleryDeleteCommitBtn" type="button">Direkt committen</button>
+          <button id="galleryDeleteCancelBtn" type="button" class="secondary-button">Schließen</button>
         </div>
       </form>
     </dialog>
